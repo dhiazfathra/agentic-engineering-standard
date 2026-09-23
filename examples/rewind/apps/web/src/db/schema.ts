@@ -5,6 +5,7 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import {
   type EventKind,
@@ -60,7 +61,10 @@ export const rewinds = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [index("rewinds_created_at_idx").on(t.createdAt)],
+  (t) => [
+    index("rewinds_created_at_idx").on(t.createdAt),
+    uniqueIndex("rewinds_media_key_idx").on(t.mediaKey),
+  ],
 );
 
 export const events = sqliteTable(

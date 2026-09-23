@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { createRewind, newId } from "@rewind/schema";
 import { events, rewinds } from "@/db/schema";
 import { db } from "@/lib/db";
-import { isForeignKeyViolation, parseBody } from "@/lib/http";
+import {
+  isForeignKeyViolation,
+  isUniqueViolation,
+  parseBody,
+} from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +46,12 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Unknown folderId or recordingLinkId" },
         { status: 400 },
+      );
+    }
+    if (isUniqueViolation(error)) {
+      return NextResponse.json(
+        { error: "mediaKey already used" },
+        { status: 409 },
       );
     }
     throw error;

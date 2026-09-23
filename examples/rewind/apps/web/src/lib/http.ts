@@ -1,16 +1,26 @@
 import { NextResponse } from "next/server";
 import type { z } from "zod";
 
-// libsql's extended SQLite result code for a foreign-key violation.
+// libsql's extended SQLite result codes.
 // https://www.sqlite.org/rescode.html#constraint_foreignkey
+// https://www.sqlite.org/rescode.html#constraint_unique
 const SQLITE_CONSTRAINT_FOREIGNKEY = "SQLITE_CONSTRAINT_FOREIGNKEY";
+const SQLITE_CONSTRAINT_UNIQUE = "SQLITE_CONSTRAINT_UNIQUE";
 
-export function isForeignKeyViolation(error: unknown): boolean {
+function hasExtendedCode(error: unknown, code: string): boolean {
   return (
     error instanceof Error &&
     "extendedCode" in error &&
-    error.extendedCode === SQLITE_CONSTRAINT_FOREIGNKEY
+    error.extendedCode === code
   );
+}
+
+export function isForeignKeyViolation(error: unknown): boolean {
+  return hasExtendedCode(error, SQLITE_CONSTRAINT_FOREIGNKEY);
+}
+
+export function isUniqueViolation(error: unknown): boolean {
+  return hasExtendedCode(error, SQLITE_CONSTRAINT_UNIQUE);
 }
 
 /**

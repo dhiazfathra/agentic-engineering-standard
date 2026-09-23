@@ -112,6 +112,16 @@ describe("POST /api/rewinds", () => {
     expect(res.status).toBe(400);
   });
 
+  it("409s when mediaKey is already used", async () => {
+    mocks.insert.mockReturnValue(chain(undefined));
+    const error = new Error("UNIQUE") as Error & { extendedCode: string };
+    error.extendedCode = "SQLITE_CONSTRAINT_UNIQUE";
+    mocks.batch.mockRejectedValue(error);
+    const res = await POST(request(validBody));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "mediaKey already used" });
+  });
+
   it("rethrows an unrelated error", async () => {
     mocks.insert.mockReturnValue(chain(undefined));
     mocks.batch.mockRejectedValue(new Error("boom"));

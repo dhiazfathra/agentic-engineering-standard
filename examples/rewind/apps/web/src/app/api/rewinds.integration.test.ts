@@ -74,6 +74,21 @@ describe("rewinds API against a real database", () => {
     expect(createRes.status).toBe(201);
     const rewind = await createRes.json();
 
+    // A second rewind reusing the same mediaKey is rejected
+    const dupRes = await rewindsRoute.POST(
+      jsonRequest("http://localhost/api/rewinds", "POST", {
+        title: "Duplicate media",
+        url: "https://example.com/cart",
+        reporterName: "Sam",
+        kind: "video",
+        mediaKey: `rewinds/${"a".repeat(21)}.webm`,
+        durationSeconds: 5,
+        events: [],
+      }),
+    );
+    expect(dupRes.status).toBe(409);
+    expect(await dupRes.json()).toEqual({ error: "mediaKey already used" });
+
     // List
     const listRes = await rewindsRoute.GET();
     expect(listRes.status).toBe(200);
