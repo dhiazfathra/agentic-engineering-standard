@@ -61,3 +61,20 @@ test("uploads to MinIO, creates and fetches a Rewind, then deletes it", async ({
     s3.send(new HeadObjectCommand({ Bucket: localEnv.S3_BUCKET, Key: key })),
   ).rejects.toThrow();
 });
+
+test("rejects a PUT whose Content-Type does not match the signed upload URL", async ({
+  request,
+}) => {
+  const uploadRes = await request.post("/api/uploads", {
+    data: { contentType: "video/webm" },
+  });
+  expect(uploadRes.status()).toBe(200);
+  const { url } = await uploadRes.json();
+
+  const putRes = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "image/png" },
+    body: new Uint8Array([1, 2, 3, 4]),
+  });
+  expect(putRes.status).toBeGreaterThanOrEqual(300);
+});
