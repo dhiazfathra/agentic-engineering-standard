@@ -1,0 +1,48 @@
+# Local MinIO for blob storage. Values default to .env.example; export
+# S3_ACCESS_KEY / S3_SECRET_KEY to override.
+#
+# ponytail: the root user doubles as the app's access key. Fine on a dev
+# box; give the app its own least-privilege user when MinIO moves to a VPS.
+x-minio-image: &minio-image quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+
+services:
+  minio:
+    image: *minio-image
+    command: server /data --console-address :9001
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-rewind}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-rewind-local-secret}
+      # Browsers PUT to presigned URLs from these origins. The extension
+      # needs no entry: host_permissions exempt it from CORS.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${S3_CORS_ORIGINS:-http://localhost:3000}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # One-shot: creates the bucket, then exits. Safe to run again.
+  mc:
+    image: *minio-image
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null &&
+        mc mb --ignore-existing "local/$$S3_BUCKET" &&
+        mc ls "local/$$S3_BUCKET"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-rewind}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-rewind-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-rewind}
+
+volumes:
+  minio-data:

@@ -133,18 +133,19 @@ start. Point an S3 client at it.
 
 **Acceptance criteria:**
 
-- [ ] `docker-compose.yml` runs `minio` on 9000 and 9001, with a named
+- [x] `docker-compose.yml` runs `minio` on 9000 and 9001, with a named
       volume and a health check. A one-shot `mc` service creates the
       `rewind` bucket, and doing so twice is safe.
-- [ ] CORS allows `http://localhost:3000`, the Vercel domain and the
-      extension origins.
-- [ ] `src/lib/storage.ts` exports `s3` (`forcePathStyle: true`), and
+- [x] CORS allows `http://localhost:3000`, plus the Vercel domain once
+      T11 sets `S3_CORS_ORIGINS`. The extension needs no entry, because
+      `host_permissions` exempt extension pages from CORS.
+- [x] `src/lib/storage.ts` exports `s3` (`forcePathStyle: true`), and
       imports `server-only`.
 
 **Verification:**
 
-- [ ] `docker compose up -d`, then `docker compose run --rm mc ls local/rewind` exits 0
-- [ ] A unit test asserts the client's endpoint and path style
+- [x] `docker compose up -d`, then `docker compose wait mc` and `docker compose run --rm mc` both exit 0
+- [x] A unit test asserts the client's endpoint and path style
 
 **Dependencies:** T4
 
