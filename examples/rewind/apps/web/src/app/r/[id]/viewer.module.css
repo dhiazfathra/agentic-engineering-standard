@@ -3,7 +3,9 @@
   flex-direction: column;
   height: 100vh;
   min-height: 0;
-  background: var(--rw-bg);
+  /* The design's app window, not the page background behind it, so the
+     timeline track (--rw-surface2) reads against it. */
+  background: var(--rw-surface);
   color: var(--rw-body);
 }
 
@@ -132,11 +134,25 @@
   position: absolute;
   inset: 0;
   display: flex;
+  flex-direction: column;
+  gap: 4px;
   align-items: center;
   justify-content: center;
+  text-align: center;
   color: var(--rw-muted);
   font-size: 13px;
   background: var(--rw-surface2);
+}
+
+.mediaUnavailableHint {
+  color: var(--rw-hint);
+  font-size: 12px;
+}
+
+.emptyState {
+  color: var(--rw-muted);
+  font-size: 13px;
+  padding: 7px 8px;
 }
 
 .pin {

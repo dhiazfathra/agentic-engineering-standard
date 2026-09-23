@@ -1,8 +1,13 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getRewind } from "@/lib/rewinds";
+import { getRewind as getRewindUncached } from "@/lib/rewinds";
 import { mediaUrl } from "@/lib/storage";
 import { Viewer } from "./viewer";
+
+// De-duped per request: generateMetadata and the page both need the row,
+// and React's cache() collapses them into a single query.
+const getRewind = cache(getRewindUncached);
 
 type Props = { params: Promise<{ id: string }> };
 

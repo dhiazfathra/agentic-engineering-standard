@@ -229,7 +229,14 @@ export function Viewer({ rewind, mediaUrl }: Props) {
         <div className={styles.headerText}>
           <div className={styles.title}>{rewind.title}</div>
           <div className={styles.meta}>
-            {rewind.reporterName} · {timeAgo(rewind.createdAt)} ·{" "}
+            {rewind.reporterName} ·{" "}
+            <time
+              dateTime={rewind.createdAt.toISOString()}
+              suppressHydrationWarning
+            >
+              {timeAgo(rewind.createdAt)}
+            </time>{" "}
+            ·{" "}
             <a href={rewind.url} target="_blank" rel="noreferrer">
               {rewind.url}
             </a>
@@ -259,7 +266,13 @@ export function Viewer({ rewind, mediaUrl }: Props) {
             onClick={onVideoClick}
           >
             {mediaError ? (
-              <div className={styles.mediaUnavailable}>Media unavailable</div>
+              <div className={styles.mediaUnavailable}>
+                <div>Media unavailable</div>
+                <div className={styles.mediaUnavailableHint}>
+                  The {isVideo ? "recording" : "screenshot"} for this Rewind is
+                  not in storage.
+                </div>
+              </div>
             ) : isVideo ? (
               <video
                 ref={mediaRef}
@@ -484,6 +497,11 @@ export function Viewer({ rewind, mediaUrl }: Props) {
               <div className={styles.infoPanel}>
                 <div>
                   <div className={styles.infoHeading}>Steps to reproduce</div>
+                  {steps.length === 0 && (
+                    <div className={styles.emptyState}>
+                      No user events recorded.
+                    </div>
+                  )}
                   {steps.map((s) => (
                     <button
                       key={s.n}
@@ -507,9 +525,13 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                   </div>
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Created</span>
-                    <span className={styles.detailValue}>
+                    <time
+                      className={styles.detailValue}
+                      dateTime={rewind.createdAt.toISOString()}
+                      suppressHydrationWarning
+                    >
                       {rewind.createdAt.toLocaleString()}
-                    </span>
+                    </time>
                   </div>
                   <div className={styles.detailRow}>
                     <span className={styles.detailLabel}>Page URL</span>
