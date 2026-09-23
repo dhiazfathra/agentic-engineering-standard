@@ -11,6 +11,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// 6 bound params per event row; 1,000 rows keeps each statement under
+// SQLite's 32,766-variable limit. All chunks share one db.batch, so the
+// rewind and its events still commit atomically.
 const EVENTS_PER_INSERT = 1_000;
 
 export async function GET() {
@@ -37,11 +40,13 @@ export async function POST(req: Request) {
       ...Array.from(
         { length: Math.ceil(rewindEvents.length / EVENTS_PER_INSERT) },
         (_, i) =>
-          db.insert(events).values(
-            rewindEvents
-              .slice(i * EVENTS_PER_INSERT, (i + 1) * EVENTS_PER_INSERT)
-              .map((e) => ({ ...e, rewindId: id })),
-          ),
+          db
+            .insert(events)
+            .values(
+              rewindEvents
+                .slice(i * EVENTS_PER_INSERT, (i + 1) * EVENTS_PER_INSERT)
+                .map((e) => ({ ...e, rewindId: id })),
+            ),
       ),
     ])) as [Awaited<typeof insertRewind>];
     return NextResponse.json(rows[0], { status: 201 });

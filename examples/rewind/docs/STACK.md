@@ -46,7 +46,7 @@ examples/rewind/
   apps/
     web/                   Next.js 16.3.6, App Router
       src/app/api/         rewinds, folders, recording-links, uploads, health routes
-      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts
+      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts, http.ts (request parsing, DB error mapping)
       src/db/              schema.ts, seed.ts (row builder) + seed-cli.ts (entry point)
       src/styles/          tokens.css (copied from the design), fonts.ts (next/font/google)
       drizzle/             generated SQL migrations
@@ -56,7 +56,7 @@ examples/rewind/
       tests/               Vitest specs (WXT reads entrypoints/ as entrypoints, so tests live here)
       e2e/                 Playwright: loads the Chrome build unpacked
   packages/
-    schema/                shared zod schemas (filled in by rewinds-api)
+    schema/                shared zod request/response contracts for the rewinds API
   docs/
     STACK.md               this file
     design/                Rewind.dc.html, a reference copy of the design
