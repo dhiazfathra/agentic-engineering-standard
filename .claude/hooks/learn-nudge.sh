@@ -1,0 +1,1 @@
+../../templates/agnostic/.claude/hooks/learn-nudge.sh

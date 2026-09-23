@@ -76,5 +76,11 @@ check "blocks on work committed in session" test -n "$(run_hook "$sid")"
 mkdir -p "$proj/learning" && touch "$proj/learning/MEMORY.md"
 check "silent once session touched learning/" test -z "$(run_hook "$sid")"
 
+# --- repo root runs the agnostic loop through symlinks ---
+for f in hooks/learn-nudge.sh settings.json skills/learn; do
+	check "root .claude/$f links to agnostic" test "$repo/.claude/$f" -ef "$repo/templates/agnostic/.claude/$f"
+done
+check "root has learning/" test -f "$repo/learning/LESSONS.md" -a -f "$repo/learning/MEMORY.md"
+
 echo "$fails failure(s)"
 exit "$fails"

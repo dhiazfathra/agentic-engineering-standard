@@ -41,18 +41,20 @@ A lesson without evidence is an opinion. Leave it out.
 
 ## 5. Promote
 
-If the path `../../templates` exists, you are inside the monorepo. Promote
-lessons and skills by their tag:
+Find the templates directory. It is `../../templates` in a project inside
+the monorepo, and `templates` at the monorepo root. Promote lessons and
+skills by their tag:
 
-- `[general]` applies to any stack. Apply it to `../../templates/agnostic/`.
+- `[general]` applies to any stack. Apply it to `<templates>/agnostic/`.
 - `[stack]` applies to this project's stack. `learning/MEMORY.md` records
   which template the project was created from. If it was the opinionated
-  template, apply the lesson to `../../templates/opinionated/`. Otherwise
-  treat the lesson as `[project]`.
+  template, apply the lesson to `<templates>/opinionated/`. At the
+  monorepo root, `[stack]` means the opinionated stack. Otherwise treat
+  the lesson as `[project]`.
 
 After you apply a lesson, add `(promoted)` to the end of its line. Leave
-project names and project paths out of the templates. If
-`../../templates` does not exist, do not promote anything.
+project names and project paths out of the templates. If neither
+directory exists, do not promote anything.
 
 ## 6. Report
 

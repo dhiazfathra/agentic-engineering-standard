@@ -19,6 +19,8 @@ templates/opinionated/     overlay on agnostic: Next.js on Vercel, Turso, MinIO
   .gitignore.append        Next.js ignores, appended to the base .gitignore
 examples/rewind/           working example and case study, built from opinionated
 docs/adr/                  architecture decision records for this repo
+learning/                  this repo's own memory and lessons
+.claude/                   symlinks to the agnostic hook, settings, and learn skill
 scripts/new-project.sh     clones a template
 tests/run.sh               tests for the script and the hook
 ```
@@ -68,6 +70,10 @@ improves those skills as it uses them. It is on by default:
 4. **Promote.** Lessons in `examples/*` flow up by tag. `[general]` lessons
    go to `templates/agnostic`, and `[stack]` lessons go to
    `templates/opinionated`. The next project you clone starts smarter.
+
+The repo root runs the same loop on itself. Its `.claude/` symlinks to the
+agnostic template's hook, settings, and learn skill, and it keeps its own
+`learning/`. Root lessons promote straight to `templates/`.
 
 ## Development
 

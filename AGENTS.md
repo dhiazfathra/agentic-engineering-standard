@@ -37,3 +37,14 @@ cloned from them. `CLAUDE.md` is a symlink to this file.
   the same change.
 - Work in this repo ends with the "Finishing work" steps in
   `templates/agnostic/AGENTS.md`. Monorepo decisions go in `docs/adr/`.
+
+## Learning loop
+
+Sessions at the root learn too. The root runs the agnostic template's
+learn skill and Stop hook through symlinks in `.claude/`, so a fix to the
+template fixes the root.
+
+- `learning/MEMORY.md`: durable facts about this monorepo. Read it at session start.
+- `learning/LESSONS.md`: what went wrong here, with evidence. `[project]`
+  lessons stay here. `[general]` and `[stack]` lessons are promoted to
+  `templates/`.
