@@ -56,35 +56,35 @@ T6 ── T7 docs (STACK.md, MEMORY)
 
 ### Phase 1: Data and logic
 
-- [ ] T1: `getRewind(id)` and `mediaUrl(key)`
-- [ ] T2: pure helpers in `src/lib/viewer.ts`
+- [x] T1: `getRewind(id)` and `mediaUrl(key)`
+- [x] T2: pure helpers in `src/lib/viewer.ts`
 
 ### Checkpoint A
 
-- [ ] `bun run test`, `lint`, `typecheck` exit 0 at 100%
-- [ ] Commit
+- [x] `bun run test`, `lint`, `typecheck` exit 0 at 100%
+- [x] Commit
 
 ### Phase 2: Page
 
-- [ ] T3: `/r/[id]/page.tsx` (found, not found)
-- [ ] T4: `Viewer` client component and `viewer.module.css`
-- [ ] T5: DOM tests for the component
+- [x] T3: `/r/[id]/page.tsx` (found, not found)
+- [x] T4: `Viewer` client component and `viewer.module.css`
+- [x] T5: DOM tests for the component
 
 ### Checkpoint B
 
-- [ ] `bun run test` at 100%; `lint`, `typecheck` clean
-- [ ] Commit
+- [x] `bun run test` at 100%; `lint`, `typecheck` clean
+- [x] Commit
 
 ### Phase 3: Proof
 
-- [ ] T6: `e2e/viewer.spec.ts`, seed in the Playwright web server
-- [ ] T7: `docs/STACK.md` (routes, e2e list), `learning/`
+- [x] T6: `e2e/viewer.spec.ts`, seed in the Playwright web server
+- [x] T7: `docs/STACK.md` (routes, e2e list), `learning/`
 
 ### Checkpoint: Complete
 
-- [ ] The six success criteria in `SPEC-viewer.md` hold, with evidence
-- [ ] `/security-review`, `/performance`, `/documentation-and-adrs`
-- [ ] The learn skill updates `learning/`
+- [x] The six success criteria in `SPEC-viewer.md` hold, with evidence
+- [x] `/security-review`, `/performance`, `/documentation-and-adrs`
+- [x] The learn skill updates `learning/`
 
 ## Risks and mitigations
 
@@ -94,3 +94,26 @@ T6 ── T7 docs (STACK.md, MEMORY)
 | `<video>` `onError` does not fire for a 404 on `src`                   | Med    | Listen on both the element and its `error` event; the e2e asserts the missing-media state on `seed-r1`.         |
 | Clipboard reads need permissions in Playwright                         | Low    | Grant `clipboard-read` and `clipboard-write` in the spec's context.                                             |
 | A comment `x`/`y` at the frame edge pushes the bubble out of the frame | Low    | Clamp the bubble like the design: `min(x, 68)%`, `min(y, 72)%`.                                                 |
+
+## Finishing notes
+
+- `/security-review` (done by hand on the changed code): the page URL
+  renders as a link only because `createRewind` restricts it to
+  `http(s)`, and it opens with `rel="noreferrer"` (which implies
+  `noopener`). Comment text and author render as React text, never as
+  HTML. Not fixed, recorded: anyone with the link can view, comment on
+  and re-status a Rewind, and the presigned media URL is valid for an
+  hour, because v1 has no auth (capability map).
+- `/performance`: the page runs one query, because `getRewind` is
+  wrapped in React's `cache()` for both `generateMetadata` and the page.
+  The server never calls MinIO. Not fixed, recorded: the event tabs
+  render every row with no virtualisation, and the whole viewer
+  re-renders on each `timeupdate` (about 4 per second). Fine at the
+  design's scale (13 events). Revisit if a real capture nears the
+  schema's 10,000-event cap.
+- `/documentation-and-adrs`: `docs/STACK.md` lists the page, the new lib
+  files and the seeded e2e. No ADR: detecting missing media in the
+  browser is recorded in `SPEC-viewer.md` and is cheap to reverse.
+- Review round before hand-off (4d0667b): SSR timestamp hydration,
+  a duplicate query, link colour, timeline contrast, and the empty and
+  missing-media states.

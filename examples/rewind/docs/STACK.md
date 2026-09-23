@@ -46,11 +46,12 @@ examples/rewind/
   apps/
     web/                   Next.js 16.3.6, App Router
       src/app/api/         rewinds, folders, recording-links, uploads, health routes
-      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts, http.ts (request parsing, DB error mapping)
+      src/app/r/[id]/      the viewer: page.tsx (server, loads the Rewind) + viewer.tsx (client)
+      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts, http.ts (request parsing, DB error mapping), rewinds.ts (getRewind), viewer.ts (viewer helpers)
       src/db/              schema.ts, seed.ts (row builder) + seed-cli.ts (entry point)
       src/styles/          tokens.css (copied from the design), fonts.ts (next/font/google)
       drizzle/             generated SQL migrations
-      e2e/                 Playwright specs (health, design tokens, rewinds upload flow)
+      e2e/                 Playwright specs (health, design tokens, rewinds upload flow, viewer); the web server seeds its fresh e2e.db
     extension/             WXT, Chrome and Firefox from one codebase
       entrypoints/         background.ts, popup/
       tests/               Vitest specs (WXT reads entrypoints/ as entrypoints, so tests live here)
