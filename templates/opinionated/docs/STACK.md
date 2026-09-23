@@ -59,3 +59,16 @@ package inside the workspace, and connect it to the GitHub repo so
 pushes to the default branch deploy. In a monorepo, set an ignored build
 step (for example `git diff --quiet HEAD^ HEAD -- <project-dir>`) so a
 push that does not touch the project skips its deploy.
+
+## Server-rendered client components
+
+A `"use client"` component still renders once on the server. Two things
+break when it hydrates:
+
+- Media `error` events do not bubble, so a `<video>` or `<img>` whose
+  `src` fails before hydration never reaches React's `onError`. Set
+  `src` in an effect after mount when the missing-media state matters.
+- The current time and locale formatting (`Date.now()`,
+  `toLocaleString()`) differ between the server (UTC on Vercel) and the
+  browser. Render them in a `<time dateTime>` with
+  `suppressHydrationWarning`, or format them after mount.
