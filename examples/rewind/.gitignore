@@ -13,11 +13,11 @@
 !.claude/skills/
 
 # Next.js / Vercel
-/node_modules
+node_modules/
 /.next/
 /out/
 /build
-/coverage
+coverage/
 .vercel
 *.tsbuildinfo
 next-env.d.ts
@@ -27,3 +27,10 @@ local.db-*
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# WXT and local test artefacts
+.output/
+.wxt/
+test-results/
+playwright-report/
+e2e.db

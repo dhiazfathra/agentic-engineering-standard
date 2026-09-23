@@ -10,17 +10,17 @@ off.
 
 **Acceptance criteria:**
 
-- [ ] `.nvmrc` holds `24`. The root `package.json` is private, sets
+- [x] `.nvmrc` holds `24`. The root `package.json` is private, sets
       `packageManager: "bun@1.4.2"` and `workspaces: ["apps/*", "packages/*"]`,
       and defines `dev`, `test`, `e2e`, `lint`, `typecheck`, `build` and
       `db:migrate` as `bun run --filter` fan-outs.
-- [ ] `packages/schema` exists, with `package.json` and an `index.ts` that
+- [x] `packages/schema` exists, with `package.json` and an `index.ts` that
       exports nothing yet.
-- [ ] `.gitignore` covers `bun` artefacts, `.output/` and `.wxt/`.
+- [x] `.gitignore` covers `bun` artefacts, `.output/` and `.wxt/`.
 
 **Verification:**
 
-- [ ] `nvm use && bun install` exits 0 and writes `bun.lock`
+- [x] `nvm use && bun install` exits 0 and writes `bun.lock`
 
 **Dependencies:** None
 
