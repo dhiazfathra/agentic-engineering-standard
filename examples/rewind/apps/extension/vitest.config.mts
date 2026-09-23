@@ -13,7 +13,12 @@ export default defineConfig({
         // DOM bootstrap only; the popup e2e proves it mounts.
         "entrypoints/popup/main.tsx",
       ],
-      thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
+      thresholds: {
+        lines: 100,
+        branches: 100,
+        functions: 100,
+        statements: 100,
+      },
     },
   },
 });

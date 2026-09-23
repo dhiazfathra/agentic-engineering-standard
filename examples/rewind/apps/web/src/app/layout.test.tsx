@@ -4,7 +4,9 @@ import RootLayout, { metadata } from "./layout";
 
 it("wraps children in an English document", () => {
   const html = renderToStaticMarkup(<RootLayout>{<p>child</p>}</RootLayout>);
-  expect(html).toBe('<html lang="en"><head></head><body><p>child</p></body></html>');
+  expect(html).toBe(
+    '<html lang="en"><head></head><body><p>child</p></body></html>',
+  );
 });
 
 it("titles the app Rewind", () => {
