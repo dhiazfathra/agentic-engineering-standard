@@ -11,6 +11,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
+const EVENTS_PER_INSERT = 1_000;
+
 export async function GET() {
   const rows = await db.query.rewinds.findMany({
     orderBy: desc(rewinds.createdAt),
@@ -32,13 +34,15 @@ export async function POST(req: Request) {
       .returning();
     const [rows] = (await db.batch([
       insertRewind,
-      ...(rewindEvents.length
-        ? [
-            db
-              .insert(events)
-              .values(rewindEvents.map((e) => ({ ...e, rewindId: id }))),
-          ]
-        : []),
+      ...Array.from(
+        { length: Math.ceil(rewindEvents.length / EVENTS_PER_INSERT) },
+        (_, i) =>
+          db.insert(events).values(
+            rewindEvents
+              .slice(i * EVENTS_PER_INSERT, (i + 1) * EVENTS_PER_INSERT)
+              .map((e) => ({ ...e, rewindId: id })),
+          ),
+      ),
     ])) as [Awaited<typeof insertRewind>];
     return NextResponse.json(rows[0], { status: 201 });
   } catch (error) {

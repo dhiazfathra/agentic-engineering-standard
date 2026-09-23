@@ -166,4 +166,30 @@ describe("rewinds API against a real database", () => {
     expect(remainingEvents.some((e) => e.rewindId === rewind.id)).toBe(false);
     expect(remainingComments.some((c) => c.rewindId === rewind.id)).toBe(false);
   });
+
+  it("stores every event when a rewind carries the maximum 10,000", async () => {
+    const res = await rewindsRoute.POST(
+      jsonRequest("http://localhost/api/rewinds", "POST", {
+        title: "Long session",
+        url: "https://example.com/",
+        reporterName: "Sam",
+        kind: "video",
+        mediaKey: `rewinds/${"b".repeat(21)}.webm`,
+        durationSeconds: 600,
+        events: Array.from({ length: 10_000 }, (_, t) => ({
+          t,
+          kind: "click",
+          text: `click ${t}`,
+          isError: false,
+        })),
+      }),
+    );
+    expect(res.status).toBe(201);
+    const rewind = await res.json();
+
+    const stored = await db.query.events.findMany({
+      where: (e, { eq }) => eq(e.rewindId, rewind.id),
+    });
+    expect(stored).toHaveLength(10_000);
+  });
 });
