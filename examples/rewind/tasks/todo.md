@@ -34,15 +34,15 @@ off.
 
 **Acceptance criteria:**
 
-- [ ] `bunx create-next-app@16.3.6 apps/web --ts --app --src-dir --eslint --no-tailwind --use-bun --skip-install --import-alias "@/*"` ran, and the demo content is removed.
-- [ ] `vitest.config.ts` sets 100% thresholds on lines, branches,
+- [x] `bunx create-next-app@16.3.6 apps/web --ts --app --src-dir --eslint --no-tailwind --use-bun --skip-install --import-alias "@/*"` ran, and the demo content is removed.
+- [x] `vitest.config.ts` sets 100% thresholds on lines, branches,
       functions and statements, and lists every excluded path.
-- [ ] One render test covers `page.tsx`, and one covers `layout.tsx`.
+- [x] One render test covers `page.tsx`, and one covers `layout.tsx`.
 
 **Verification:**
 
-- [ ] `bun run --filter web test` passes at 100%
-- [ ] `bun run --filter web build` exits 0
+- [x] `bun run --filter web test` passes at 100%
+- [x] `bun run --filter web build` exits 0
 
 **Dependencies:** T1
 
