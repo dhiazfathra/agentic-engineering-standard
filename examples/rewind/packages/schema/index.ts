@@ -42,22 +42,22 @@ export const uploadRequest = z.object({
 export const event = z.object({
   t: z.number().min(0),
   kind: eventKind,
-  text: z.string(),
+  text: z.string().max(10_000),
   isError: z.boolean().default(false),
 });
 
 export const createRewind = z
   .object({
     title: z.string().min(1).max(200),
-    url: z.string(),
-    reporterName: z.string(),
+    url: z.url({ protocol: /^https?$/ }).max(2048),
+    reporterName: z.string().min(1).max(100),
     status: rewindStatus.default("new"),
     kind: rewindKind,
     mediaKey: z.string().regex(mediaKeyPattern),
     durationSeconds: z.number().gt(0).nullable().optional(),
     folderId: z.string().nullable().optional(),
     recordingLinkId: z.string().nullable().optional(),
-    events: z.array(event).default([]),
+    events: z.array(event).max(10_000).default([]),
   })
   .refine(
     (v) =>
@@ -86,8 +86,8 @@ export const createComment = z.object({
   t: z.number().min(0),
   x: z.number().min(0).max(100),
   y: z.number().min(0).max(100),
-  author: z.string().min(1),
-  text: z.string().min(1),
+  author: z.string().min(1).max(100),
+  text: z.string().min(1).max(5_000),
 });
 
 export const createFolder = z.object({ name: z.string().min(1).max(100) });

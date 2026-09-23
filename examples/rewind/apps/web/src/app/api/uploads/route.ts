@@ -15,6 +15,8 @@ export async function POST(req: Request) {
       parsed.contentType as keyof typeof contentTypeToExtension
     ];
   const key = `rewinds/${newId()}.${ext}`;
+  // debt: a presigned PUT cannot cap size; switch to a presigned POST policy
+  // with content-length-range when uploads are public.
   const url = await getSignedUrl(
     s3,
     new PutObjectCommand({

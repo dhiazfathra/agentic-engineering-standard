@@ -204,6 +204,66 @@ describe("createRewind", () => {
     );
   });
 
+  it.each([
+    ["javascript:alert(1)", false],
+    ["http://example.com", true],
+    ["https://example.com", true],
+    ["ftp://example.com", false],
+    ["not a url", false],
+  ])("url %s -> accepted: %s", (url, accepted) => {
+    expect(createRewind.safeParse({ ...baseVideo, url }).success).toBe(
+      accepted,
+    );
+  });
+
+  it.each([
+    [100, true],
+    [101, false],
+  ])("reporterName length %i -> accepted: %s", (len, accepted) => {
+    expect(
+      createRewind.safeParse({ ...baseVideo, reporterName: "a".repeat(len) })
+        .success,
+    ).toBe(accepted);
+  });
+
+  it("rejects an empty reporterName", () => {
+    expect(
+      createRewind.safeParse({ ...baseVideo, reporterName: "" }).success,
+    ).toBe(false);
+  });
+
+  it.each([
+    [10_000, true],
+    [10_001, false],
+  ])("event text length %i -> accepted: %s", (len, accepted) => {
+    expect(
+      createRewind.safeParse({
+        ...baseVideo,
+        events: [{ t: 0, kind: "log", text: "a".repeat(len) }],
+      }).success,
+    ).toBe(accepted);
+  });
+
+  it.each([
+    [10_000, true],
+    [10_001, false],
+  ])(
+    "events array length %i -> accepted: %s",
+    (len, accepted) => {
+      expect(
+        createRewind.safeParse({
+          ...baseVideo,
+          events: Array.from({ length: len }, (_, i) => ({
+            t: i,
+            kind: "log" as const,
+            text: "e",
+          })),
+        }).success,
+      ).toBe(accepted);
+    },
+    10_000,
+  );
+
   it("accepts nullable folderId, recordingLinkId, and events", () => {
     const parsed = createRewind.safeParse({
       ...baseVideo,
@@ -260,8 +320,26 @@ describe("createComment", () => {
     );
   });
 
+  it.each([
+    [100, true],
+    [101, false],
+  ])("author length %i -> accepted: %s", (len, accepted) => {
+    expect(
+      createComment.safeParse({ ...base, author: "a".repeat(len) }).success,
+    ).toBe(accepted);
+  });
+
   it("rejects empty text", () => {
     expect(createComment.safeParse({ ...base, text: "" }).success).toBe(false);
+  });
+
+  it.each([
+    [5_000, true],
+    [5_001, false],
+  ])("text length %i -> accepted: %s", (len, accepted) => {
+    expect(
+      createComment.safeParse({ ...base, text: "a".repeat(len) }).success,
+    ).toBe(accepted);
   });
 });
 
