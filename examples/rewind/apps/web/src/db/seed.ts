@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import { comments, events, folders, recordingLinks, rewinds } from "./schema";
 import type * as schema from "./schema";
@@ -223,11 +222,12 @@ export function buildSeedRows(now: Date): SeedRows {
 }
 
 /**
- * Idempotent: upserts the seed rows by their fixed ids, in one batch.
+ * Idempotent: inserts any missing seed rows by their fixed ids, in one batch.
  *
- * Upsert (not delete-then-insert) so re-seeding doesn't cascade away
- * user-added comments/events on seeded Rewinds, or null out user Rewinds'
- * folderId via the folders FK's ON DELETE SET NULL.
+ * Insert-if-missing (not delete-then-insert, not update-on-conflict) so
+ * re-seeding only restores deleted sample rows. It never cascades away
+ * user-added comments/events, nulls out user Rewinds' folderId, or reverts
+ * user edits to seeded rows.
  */
 export async function seed(db: Db, now: Date): Promise<void> {
   const rows = buildSeedRows(now);
@@ -236,63 +236,22 @@ export async function seed(db: Db, now: Date): Promise<void> {
     db
       .insert(folders)
       .values(rows.folders)
-      .onConflictDoUpdate({
-        target: folders.id,
-        set: { name: sql`excluded.name`, createdAt: sql`excluded.createdAt` },
-      }),
+      .onConflictDoNothing({ target: folders.id }),
     db
       .insert(recordingLinks)
       .values(rows.recordingLinks)
-      .onConflictDoUpdate({
-        target: recordingLinks.id,
-        set: { name: sql`excluded.name`, createdAt: sql`excluded.createdAt` },
-      }),
+      .onConflictDoNothing({ target: recordingLinks.id }),
     db
       .insert(rewinds)
       .values(rows.rewinds)
-      .onConflictDoUpdate({
-        target: rewinds.id,
-        set: {
-          title: sql`excluded.title`,
-          url: sql`excluded.url`,
-          reporterName: sql`excluded.reporterName`,
-          status: sql`excluded.status`,
-          kind: sql`excluded.kind`,
-          mediaKey: sql`excluded.mediaKey`,
-          durationSeconds: sql`excluded.durationSeconds`,
-          folderId: sql`excluded.folderId`,
-          recordingLinkId: sql`excluded.recordingLinkId`,
-          createdAt: sql`excluded.createdAt`,
-          updatedAt: sql`excluded.updatedAt`,
-        },
-      }),
+      .onConflictDoNothing({ target: rewinds.id }),
     db
       .insert(events)
       .values(rows.events)
-      .onConflictDoUpdate({
-        target: events.id,
-        set: {
-          rewindId: sql`excluded.rewindId`,
-          t: sql`excluded.t`,
-          kind: sql`excluded.kind`,
-          text: sql`excluded.text`,
-          isError: sql`excluded.isError`,
-        },
-      }),
+      .onConflictDoNothing({ target: events.id }),
     db
       .insert(comments)
       .values(rows.comments)
-      .onConflictDoUpdate({
-        target: comments.id,
-        set: {
-          rewindId: sql`excluded.rewindId`,
-          t: sql`excluded.t`,
-          x: sql`excluded.x`,
-          y: sql`excluded.y`,
-          author: sql`excluded.author`,
-          text: sql`excluded.text`,
-          createdAt: sql`excluded.createdAt`,
-        },
-      }),
+      .onConflictDoNothing({ target: comments.id }),
   ]);
 }

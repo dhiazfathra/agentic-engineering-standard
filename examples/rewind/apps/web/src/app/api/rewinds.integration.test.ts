@@ -20,6 +20,7 @@ const commentsRoute = await import("./rewinds/[id]/comments/route");
 const foldersRoute = await import("./folders/route");
 const folderIdRoute = await import("./folders/[id]/route");
 const linksRoute = await import("./recording-links/route");
+const { seed } = await import("@/db/seed");
 
 beforeAll(async () => {
   await migrate(db, { migrationsFolder: "drizzle" });
@@ -227,5 +228,55 @@ describe("rewinds API against a real database", () => {
       { params: Promise.resolve({ id: rewind.id as string }) },
     );
     expect(res.status).toBe(400);
+  });
+
+  it("re-seeding keeps user edits to seeded rows", async () => {
+    await seed(db, new Date("2026-01-01T00:00:00.000Z"));
+
+    const patchRes = await rewindIdRoute.PATCH(
+      jsonRequest("http://localhost/api/rewinds/seed-r1", "PATCH", {
+        status: "done",
+        folderId: null,
+      }),
+      { params: Promise.resolve({ id: "seed-r1" }) },
+    );
+    expect(patchRes.status).toBe(200);
+    const patched = await patchRes.json();
+
+    const renameRes = await folderIdRoute.PATCH(
+      jsonRequest(
+        "http://localhost/api/folders/seed-folder-checkout",
+        "PATCH",
+        {
+          name: "Renamed",
+        },
+      ),
+      { params: Promise.resolve({ id: "seed-folder-checkout" }) },
+    );
+    expect(renameRes.status).toBe(200);
+
+    await seed(db, new Date("2026-06-01T00:00:00.000Z"));
+
+    const getRes = await rewindIdRoute.GET(
+      jsonRequest("http://localhost/api/rewinds/seed-r1", "GET"),
+      { params: Promise.resolve({ id: "seed-r1" }) },
+    );
+    const after = await getRes.json();
+    expect(after).toMatchObject({
+      status: "done",
+      folderId: null,
+      createdAt: patched.createdAt,
+      updatedAt: patched.updatedAt,
+    });
+
+    const folderList = await (await foldersRoute.GET()).json();
+    expect(folderList).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "seed-folder-checkout",
+          name: "Renamed",
+        }),
+      ]),
+    );
   });
 });
