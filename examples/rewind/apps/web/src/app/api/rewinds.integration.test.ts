@@ -192,4 +192,40 @@ describe("rewinds API against a real database", () => {
     });
     expect(stored).toHaveLength(10_000);
   });
+
+  it("404s a comment on an unknown rewind", async () => {
+    const res = await commentsRoute.POST(
+      jsonRequest("http://localhost/api/rewinds/nope/comments", "POST", {
+        t: 1,
+        x: 10,
+        y: 10,
+        author: "Sam",
+        text: "orphan",
+      }),
+      { params: Promise.resolve({ id: "nope" }) },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("400s a PATCH with an unknown folderId", async () => {
+    const createRes = await rewindsRoute.POST(
+      jsonRequest("http://localhost/api/rewinds", "POST", {
+        title: "Patch target",
+        url: "https://example.com/",
+        reporterName: "Sam",
+        kind: "video",
+        mediaKey: `rewinds/${"c".repeat(21)}.webm`,
+        durationSeconds: 1,
+        events: [],
+      }),
+    );
+    const rewind = await createRes.json();
+    const res = await rewindIdRoute.PATCH(
+      jsonRequest(`http://localhost/api/rewinds/${rewind.id}`, "PATCH", {
+        folderId: "nope",
+      }),
+      { params: Promise.resolve({ id: rewind.id as string }) },
+    );
+    expect(res.status).toBe(400);
+  });
 });

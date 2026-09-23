@@ -7,12 +7,12 @@ import type { z } from "zod";
 const SQLITE_CONSTRAINT_FOREIGNKEY = "SQLITE_CONSTRAINT_FOREIGNKEY";
 const SQLITE_CONSTRAINT_UNIQUE = "SQLITE_CONSTRAINT_UNIQUE";
 
+// drizzle wraps single-statement errors in a DrizzleQueryError and puts
+// the LibsqlError on `.cause`, so walk the cause chain.
 function hasExtendedCode(error: unknown, code: string): boolean {
-  return (
-    error instanceof Error &&
-    "extendedCode" in error &&
-    error.extendedCode === code
-  );
+  if (!(error instanceof Error)) return false;
+  if ("extendedCode" in error && error.extendedCode === code) return true;
+  return hasExtendedCode(error.cause, code);
 }
 
 export function isForeignKeyViolation(error: unknown): boolean {
