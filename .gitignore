@@ -36,7 +36,7 @@ yarn-error.log*
 next-env.d.ts
 
 # Agentic
-.claude
+.headroom**
 .serena
 .tokensave
 

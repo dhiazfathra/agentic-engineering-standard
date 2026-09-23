@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.env*
+*.pem
+
+# Local agent and editor state. Committed agent config is re-included below.
+.serena/
+.tokensave
+.procoder/state/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/skills/

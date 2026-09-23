@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Tests for scripts/new-project.sh and the learn-nudge Stop hook.
+set -uo pipefail
+
+repo=$(cd "$(dirname "$0")/.." && pwd)
+hook=$repo/template/.claude/hooks/learn-nudge.sh
+fails=0
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+check() { # name, then a command that must succeed
+	local name=$1
+	shift
+	if "$@"; then echo "ok   $name"; else
+		echo "FAIL $name"
+		fails=$((fails + 1))
+	fi
+}
+
+# --- new-project.sh (run against a copy so examples/ stays untouched) ---
+cp -R "$repo/scripts" "$repo/template" "$tmp/"
+np=$tmp/scripts/new-project.sh
+
+check "rejects invalid name" bash -c "! '$np' Bad_Name 2>/dev/null"
+check "rejects missing name" bash -c "! '$np' 2>/dev/null"
+check "creates examples/<name> by default" bash -c "'$np' demo >/dev/null && [ -f '$tmp/examples/demo/AGENTS.md' ]"
+check "substitutes project name" grep -q '^# demo$' "$tmp/examples/demo/AGENTS.md"
+check "leaves no .bak behind" test ! -e "$tmp/examples/demo/AGENTS.md.bak"
+check "keeps CLAUDE.md symlink" test -L "$tmp/examples/demo/CLAUDE.md"
+check "copies hidden .claude dir" test -x "$tmp/examples/demo/.claude/hooks/learn-nudge.sh"
+check "refuses existing dest" bash -c "! '$np' demo 2>/dev/null"
+check "honours custom dest" bash -c "'$np' solo '$tmp/out/solo' >/dev/null && [ -f '$tmp/out/solo/AGENTS.md' ]"
+
+# --- learn-nudge.sh ---
+proj=$tmp/proj
+mkdir -p "$proj" && git -C "$proj" init -q
+run_hook() { echo "$1" | CLAUDE_PROJECT_DIR=$proj "$hook"; }
+
+check "silent on clean tree" test -z "$(run_hook '{}')"
+touch "$proj/app.ts"
+check "blocks when learning/ untouched" bash -c "[[ \$(echo '{}' | CLAUDE_PROJECT_DIR='$proj' '$hook') == *'\"decision\":\"block\"'* ]]"
+check "lets second stop through" test -z "$(run_hook '{"stop_hook_active": true}')"
+mkdir -p "$proj/learning" && touch "$proj/learning/LESSONS.md"
+check "silent once learning/ changed" test -z "$(run_hook '{}')"
+check "silent outside git" test -z "$(echo '{}' | CLAUDE_PROJECT_DIR=$tmp/out "$hook")"
+check "hook output is valid JSON" bash -c "rm -rf '$proj/learning'; echo '{}' | CLAUDE_PROJECT_DIR='$proj' '$hook' | jq -e .decision >/dev/null"
+
+echo "$fails failure(s)"
+exit "$fails"
