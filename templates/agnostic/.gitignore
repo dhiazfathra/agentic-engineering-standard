@@ -1,6 +1,7 @@
 .DS_Store
 .env
 .env*
+!.env.example
 *.pem
 
 # Local agent and editor state. Committed agent config is re-included below.
