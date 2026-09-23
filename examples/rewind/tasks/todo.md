@@ -189,13 +189,13 @@ database and the real MinIO container.
 
 **Acceptance criteria:**
 
-- [ ] `playwright.config.ts` runs `next build && next start` as its web
+- [x] `playwright.config.ts` runs `next build && next start` as its web
       server, with `DATABASE_URL=file:e2e.db`.
-- [ ] `e2e/health.spec.ts` expects `200 {"database":"ok","storage":"ok"}`.
+- [x] `e2e/health.spec.ts` expects `200 {"database":"ok","storage":"ok"}`.
 
 **Verification:**
 
-- [ ] With MinIO up, `bun run --filter web e2e` exits 0
+- [x] With MinIO up, `bun run --filter web e2e` exits 0
 
 **Dependencies:** T7
 

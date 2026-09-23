@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { localEnv } from "./local-env";
 
 export default defineConfig({
   resolve: {
@@ -12,14 +13,7 @@ export default defineConfig({
     },
   },
   test: {
-    // Local defaults from .env.example, so modules that read env at import load.
-    env: {
-      DATABASE_URL: ":memory:",
-      S3_ENDPOINT: "http://localhost:9000",
-      S3_BUCKET: "rewind",
-      S3_ACCESS_KEY: "rewind",
-      S3_SECRET_KEY: "rewind-local-secret",
-    },
+    env: { ...localEnv, DATABASE_URL: ":memory:" },
     include: ["src/**/*.test.{ts,tsx}"],
     coverage: {
       provider: "v8",
