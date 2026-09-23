@@ -58,8 +58,9 @@ The loop is modelled on [Hermes Agent](https://github.com/NousResearch/hermes-ag
 which curates its own memory, creates skills after complex tasks, and
 improves those skills as it uses them. It is on by default:
 
-1. **Nudge.** When a turn ends with changed files but `learning/` untouched,
-   the Stop hook blocks once and asks for the `learn` skill.
+1. **Nudge.** When a turn ends and the session changed files but not
+   `learning/`, the Stop hook blocks once and asks for the `learn` skill.
+   Files that were already dirty when the session started do not count.
 2. **Record.** The skill writes facts to `MEMORY.md` and evidence-backed
    lessons to `LESSONS.md`.
 3. **Grow skills.** When a procedure repeats, the skill writes it down as a

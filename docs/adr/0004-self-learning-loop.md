@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. The nudge trigger is superseded by ADR-0007.
 
 ## Date
 
