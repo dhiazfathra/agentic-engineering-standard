@@ -11,12 +11,15 @@
     "test": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "bun src/db/seed-cli.ts",
     "e2e": "playwright test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1138.0",
+    "@aws-sdk/s3-request-presigner": "3.1138.0",
     "@libsql/client": "0.18.0",
     "@next/env": "16.3.6",
+    "@rewind/schema": "workspace:*",
     "drizzle-orm": "0.45.3",
     "next": "16.3.6",
     "react": "19.3.0",
@@ -33,7 +36,7 @@
     "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.6",
-    "typescript": "7.0.2",
+    "typescript": "5.9.3",
     "vitest": "5.0.1"
   },
   "ignoreScripts": [

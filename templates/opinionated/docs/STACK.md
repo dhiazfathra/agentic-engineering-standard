@@ -33,6 +33,11 @@ Typecheck:  bun run typecheck           # tsc --noEmit in every package
 Build:      bun run build               # next build; wxt build (chrome-mv3, firefox-mv2)
 ```
 
+Stay on TypeScript 5.x until typescript-eslint supports TypeScript 7: the
+native TS 7 has no JS compiler API, so `bun run lint` fails in every
+package. After any toolchain bump, run `lint` and `typecheck` even when no
+`.ts` file changed.
+
 ## Environment
 
 List every variable in `.env.example`, with local defaults and no

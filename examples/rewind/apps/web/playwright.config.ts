@@ -7,9 +7,18 @@ export default defineConfig({
   testDir: "./e2e",
   use: { baseURL: `http://localhost:${port}` },
   webServer: {
-    command: `next build && next start -p ${port}`,
+    // Fresh DB each run: delete a stale e2e.db, migrate, then build+start.
+    command: `rm -f e2e.db && drizzle-kit migrate && next build && next start -p ${port}`,
     url: `http://localhost:${port}`,
-    env: { ...localEnv, DATABASE_URL: "file:e2e.db" },
+    env: {
+      ...localEnv,
+      DATABASE_URL: "file:e2e.db",
+      // Let a real S3_ENDPOINT (e.g. a port-remapped MinIO) override the
+      // .env.example default, without changing that default.
+      ...(process.env.S3_ENDPOINT
+        ? { S3_ENDPOINT: process.env.S3_ENDPOINT }
+        : {}),
+    },
     timeout: 180_000,
     reuseExistingServer: false,
   },

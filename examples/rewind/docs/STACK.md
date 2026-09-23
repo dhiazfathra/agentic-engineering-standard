@@ -24,6 +24,7 @@ Setup:      nvm use && bun install && cp .env.example apps/web/.env.local
 Infra up:   docker compose up -d        # MinIO on :9000, console on :9001
 Infra down: docker compose down         # add -v to wipe the bucket
 Migrate:    bun run db:migrate          # drizzle-kit migrate against DATABASE_URL
+Seed:       bun run db:seed             # design's sample rewinds; idempotent (insert-if-missing, keeps user data)
 Dev:        bun run dev                 # next dev on :3000 and wxt dev, in parallel
 Dev (FF):   bun run --filter extension dev:firefox
 Test:       bun run test                # vitest run --coverage in every package
@@ -44,17 +45,18 @@ examples/rewind/
   .env.example             every variable, with local defaults, no secrets
   apps/
     web/                   Next.js 16.3.6, App Router
-      src/app/             routes; api/health/route.ts checks the database and storage
-      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts
+      src/app/api/         rewinds, folders, recording-links, uploads, health routes
+      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts, http.ts (request parsing, DB error mapping)
+      src/db/              schema.ts, seed.ts (row builder) + seed-cli.ts (entry point)
       src/styles/          tokens.css (copied from the design), fonts.ts (next/font/google)
       drizzle/             generated SQL migrations
-      e2e/                 Playwright specs (health, design tokens)
+      e2e/                 Playwright specs (health, design tokens, rewinds upload flow)
     extension/             WXT, Chrome and Firefox from one codebase
       entrypoints/         background.ts, popup/
       tests/               Vitest specs (WXT reads entrypoints/ as entrypoints, so tests live here)
       e2e/                 Playwright: loads the Chrome build unpacked
   packages/
-    schema/                shared zod schemas (filled in by rewinds-api)
+    schema/                shared zod request/response contracts for the rewinds API
   docs/
     STACK.md               this file
     design/                Rewind.dc.html, a reference copy of the design
@@ -74,6 +76,10 @@ invalid variable.
 | `S3_BUCKET`           | `rewind`                | `rewind`                                                  |
 | `S3_ACCESS_KEY`       | `rewind`                | same                                                      |
 | `S3_SECRET_KEY`       | local-only value        | same, production only                                     |
+
+A real `S3_ENDPOINT` env var overrides the `.env.example` default for the
+web e2e suite, so MinIO can run on remapped ports when 9000 is already
+taken locally (`S3_ENDPOINT=http://localhost:9100 bun run --filter web e2e`).
 
 ## Deploy
 

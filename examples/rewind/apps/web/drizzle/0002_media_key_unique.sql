@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `rewinds_media_key_idx` ON `rewinds` (`mediaKey`);
