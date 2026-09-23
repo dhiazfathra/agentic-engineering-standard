@@ -64,42 +64,42 @@ T10 + T11 ── T12 STACK.md update if commands changed
 
 ### Phase 1: Contract and schema
 
-- [ ] T1: `packages/schema` — zod types, nanoid helper
-- [ ] T2: Drizzle schema, migration
+- [x] T1: `packages/schema` — zod types, nanoid helper
+- [x] T2: Drizzle schema, migration
 
 ### Checkpoint A
 
-- [ ] `bun run db:migrate` exits 0 against `file:local.db`
-- [ ] Commit (the no-mistakes pipeline owns the push for this branch)
+- [x] `bun run db:migrate` exits 0 against `file:local.db`
+- [x] Commit (the no-mistakes pipeline owns the push for this branch)
 
 ### Phase 2: Routes
 
-- [ ] T3: `/api/uploads`
-- [ ] T4: `/api/rewinds` (GET, POST)
-- [ ] T5: `/api/rewinds/[id]` (GET, PATCH, DELETE)
-- [ ] T6: `/api/rewinds/[id]/comments` (POST)
-- [ ] T7: `/api/folders`, `/api/folders/[id]`
-- [ ] T8: `/api/recording-links`
+- [x] T3: `/api/uploads`
+- [x] T4: `/api/rewinds` (GET, POST)
+- [x] T5: `/api/rewinds/[id]` (GET, PATCH, DELETE)
+- [x] T6: `/api/rewinds/[id]/comments` (POST)
+- [x] T7: `/api/folders`, `/api/folders/[id]`
+- [x] T8: `/api/recording-links`
 
 ### Checkpoint B
 
-- [ ] `bun run test` at 100% coverage; `lint` and `typecheck` clean
-- [ ] Commit
+- [x] `bun run test` at 100% coverage; `lint` and `typecheck` clean
+- [x] Commit
 
 ### Phase 3: Seed and proof
 
-- [ ] T9: `db:seed`
-- [ ] T10: integration test — create → list → get → patch → delete, and
+- [x] T9: `db:seed`
+- [x] T10: integration test — create → list → get → patch → delete, and
       folder/link CRUD, against a migrated temporary `file:` database
       (same engine as `file:local.db`, without clobbering the dev DB)
-- [ ] T11: upload → finalize → fetch e2e against real MinIO
-- [ ] T12: update `docs/STACK.md` if `db:seed` or other commands are new
+- [x] T11: upload → finalize → fetch e2e against real MinIO
+- [x] T12: update `docs/STACK.md` if `db:seed` or other commands are new
 
 ### Checkpoint: Complete
 
-- [ ] All five success criteria in `SPEC-rewinds-api.md` hold, with evidence
-- [ ] Finishing steps: `/security-review`, `/performance`, `/documentation-and-adrs`
-- [ ] The learn skill updates `learning/`
+- [x] All five success criteria in `SPEC-rewinds-api.md` hold, with evidence
+- [x] Finishing steps: `/security-review`, `/performance`, `/documentation-and-adrs`
+- [x] The learn skill updates `learning/`
 - [ ] Human review before `viewer` starts
 
 ## Risks and mitigations
@@ -127,3 +127,17 @@ Checked against the approved spec on 2026-09-23:
 ## Open questions
 
 None outstanding — spec's three questions are resolved and recorded there.
+
+## Finishing notes
+
+- `/security-review` (done by hand on the changed code): fixed
+  unvalidated `url` (`javascript:` links in `viewer`), unbounded strings
+  and event arrays, and shared media keys (unique index, 409). Not fixed,
+  recorded: no auth in v1 (spec decision), and a presigned `PUT` cannot
+  cap size (`debt:` comment in `uploads/route.ts`, ADR-0001).
+- `/performance`: every read uses an index (`rewinds.createdAt`,
+  `events.rewindId`, `comments.rewindId`); create writes the Rewind and
+  its events in one `db.batch`. `GET /api/rewinds` is unpaginated by spec
+  decision until `library`. Nothing measured needed a fix.
+- `/documentation-and-adrs`: `docs/STACK.md` updated; media-key contract
+  recorded as `docs/adr/0001-server-owned-media-keys.md`.
