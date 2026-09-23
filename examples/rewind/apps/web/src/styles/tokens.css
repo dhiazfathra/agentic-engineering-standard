@@ -1,0 +1,432 @@
+/*
+ * Design tokens for Rewind. Copied, not linked, from the Claude Design
+ * project 9bb10f93-f534-4e75-831a-253a96666114:
+ *   - :root blocks from _ds/design-system-65475502-dc49-4a77-b1cb-bd52efd5a09b/_ds_bundle.css
+ *     (generated from the design system's Dart theme upstream)
+ *   - body and body.rw-dark blocks from Rewind.dc.html
+ * Refresh by re-copying from the design; do not hand-edit values.
+ */
+
+:root {
+  /* Brand / Primary */
+  --color-primary: #01afaf;
+  --color-brand050: #effefc;
+  --color-secondary: #dcfffd;
+  --color-primary-light: #e0f7f7;
+  --color-primary-dark: #007a7a;
+  --color-primary-container: #b2dfdf;
+  --color-primary-soft-bg: #ecfefc;
+  --color-review-popup-gradient-mid: #a8f3ee;
+  --color-review-popup-gradient-bottom: #c6fff8;
+  --color-grey-bg: #f3f3f3;
+  --color-bg-neutral-tertiary-soft: #f3f4f6;
+  --color-available-bg: #ccf6d7;
+  --color-badge-border-green: #a4f4cf;
+  --color-badge-bg-green: #ecfdf5;
+  --color-badge-text-green: #006045;
+  --color-badge-bg-orange: #fff3e0;
+  --color-badge-text-orange: #e65100;
+  --color-badge-bg-blue: #eef2ff;
+  --color-badge-text-blue: #3538cd;
+  --color-badge-bg-amber: #fef9c2;
+  --color-badge-text-amber: #a65f00;
+  --color-badge-bg-peach: #fff8f1;
+  --color-badge-border-peach: #fcd9bd;
+  --color-badge-text-brown: #771d1d;
+  --color-badge-bg-indigo: #eef6ff;
+  --color-badge-text-indigo: #1c398e;
+  --color-badge-border-danger: #ffccd3;
+  --color-badge-border-indigo: #b6d6ff;
+  --color-tag-label-text: #d7c7b1;
+  --color-available: #30ac4b;
+  --color-not-available: #f97678;
+  --color-not-available-bg: #fecdce;
+
+  /* Neutral */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-background: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-divider: #e5e5e5;
+  --color-shadow: rgb(0 0 0 / 0.102);
+  --color-grey: #737577;
+  --color-green-k700: #067e7f;
+  --color-green-k400: #1ee3dc;
+  --color-green-k800: #0a6365;
+  --color-green-k500: #05c7c3;
+  --color-award-gradient-mid: #017c7c;
+  --color-award-gradient-deep: #016363;
+  --color-award-gradient-deepest: #004949;
+  --color-neutral-gray600: #4a5565;
+  --color-grey300: #e0e0e0;
+  --color-black87: rgb(0 0 0 / 0.867);
+  --color-black26: rgb(0 0 0 / 0.259);
+  --color-border-grey-light: #dbdbdb;
+  --color-white80: rgb(255 255 255 / 0.8);
+  --color-text-grey-muted: #707070;
+  --color-text-near-black: #1a1a1a;
+  --color-light-green: #8bc34a;
+
+  /* Text */
+  --color-text-body: #4a5565;
+  --color-text-primary: #333333;
+  --color-text-secondary: #666666;
+  --color-text-secondary-dark: #31353b;
+  --color-text-hint: #999999;
+  --color-text-disabled: #bdbdbd;
+  --color-text-fg-disabled: #99a1af;
+
+  /* Icon */
+  --color-icon-default: #333333;
+  --color-icon-muted: #9e9e9e;
+
+  /* Semantic */
+  --color-success: #34c759;
+  --color-success-dark: #248a3d;
+  --color-warning: #ffc107;
+  --color-warning-light: #fff8e1;
+  --color-error: #e35e5e;
+  --color-error-light: #ffebee;
+  --color-error-dark: #c70036;
+  --color-handle: #d9d9d9;
+  --color-star: #ffc107;
+  --color-search-hint: #949494;
+
+  /* Membership tiers */
+  --color-member-green: #2e7d32;
+  --color-member-green-light: #e8f5e9;
+  --color-member-silver: #9e9e9e;
+  --color-member-silver-light: #f5f5f5;
+  --color-member-gold: #ff8f00;
+  --color-member-gold-light: #fff8e1;
+  --color-member-platinum: #546e7a;
+  --color-member-platinum-light: #eceff1;
+  --color-membership-gold-start: #cba14b;
+  --color-membership-gold-end: #7a4e1e;
+  --color-membership-priority-start: #39424f;
+  --color-membership-priority-end: #161b22;
+
+  /* Shimmer / Skeleton loading */
+  --color-shimmer-base: #e6e8eb;
+  --color-shimmer-highlight: #f5f7f9;
+  --color-shimmer-image-base: #cbcfd7;
+  --color-initial-icon: #b2dddb;
+  --color-avatar-initial-text: #c8fff8;
+  --color-qa-member-bg: #0a6365;
+  --color-slate100: #f1f5f9;
+  --color-slate600: #4a5565;
+
+  /* Dark theme */
+  --color-dark-background: #121212;
+  --color-dark-surface: #1e1e1e;
+  --color-dark-container: #2c2c2c;
+  --color-dark-text-primary: #e0e0e0;
+  --color-dark-text-secondary: #cccccc;
+  --color-dark-text-tertiary: #aaaaaa;
+  --color-dark-hint: #666666;
+  --color-dark-divider: #333333;
+  --color-dark-border: #444444;
+  --color-grey-border: #f5e9e9;
+  --color-dark-tertiary-container: #4a3500;
+  --color-dark-error-container: #4a0010;
+  --color-inactive-navbar: #b3afaf;
+  --color-transparent: transparent;
+  --color-overlay: rgb(0 0 0 / 0.502);
+
+  /* Additional colors can be added here as needed */
+  --color-header-gradient-dark: #042c2c;
+  --color-on-boarding-title: #067e7f;
+  --color-bg-not-login: #51f7ec;
+  --color-border-field: #f9fafb;
+  --color-border-menu: #e5e7eb;
+  --color-brand-label: #513732;
+  --color-text-heading: #101828;
+  --color-bg-danger-soft: #fef0f2;
+  --color-bg-danger-strong: #8b0836;
+  --color-bg-surface-soft: #f8f9fa;
+  --color-divider-soft: #f1f2f5;
+  --color-chat-bubble-mine: #c1fff7;
+  --color-patient-card-beige: #eae2d7;
+  --color-patient-card-teal: #8ce5e3;
+
+  /* Questionnaire result */
+  --color-questionnaire-result-background: #1d4a4a;
+  --color-questionnaire-result-chip: rgb(255 255 255 / 0.2);
+  --color-skin-scale-dry: #ede6dc;
+  --color-skin-scale-normal: #d9c9b4;
+  --color-skin-scale-oily: #c4a882;
+  --color-skin-scale-combination: #a98455;
+  --color-patient-avatar-holder: #9b7353;
+
+  /* About section (brand landing) */
+  --color-about-heading: #003033;
+  --color-about-gradient-start: rgb(200 255 248 / 0);
+  --color-about-gradient-mid: rgb(200 255 248 / 0.541);
+  --color-about-gradient-end: #c8fff8;
+  --color-about-award-label: #18181b;
+  --color-image-placeholder: #f4f4f5;
+  --color-image-placeholder-icon: #d4d4d8;
+  --color-image-broken-fill: #d4d4d8;
+}
+
+:root {
+  /* Spacing scale (4-pt grid) */
+  --dim-space2: 2px;
+  --dim-space4: 4px;
+  --dim-space6: 6px;
+  --dim-space8: 8px;
+  --dim-space10: 10px;
+  --dim-space12: 12px;
+  --dim-space14: 14px;
+  --dim-space16: 16px;
+  --dim-space20: 20px;
+  --dim-space24: 24px;
+  --dim-space28: 28px;
+  --dim-space32: 32px;
+  --dim-space40: 40px;
+  --dim-space48: 48px;
+  --dim-detail-cta-bar-height: 72px;
+
+  /* Border radius */
+  --dim-radius2: 2px;
+  --dim-radius4: 4px;
+  --dim-radius6: 6px;
+  --dim-radius8: 8px;
+  --dim-radius12: 12px;
+  --dim-radius16: 16px;
+  --dim-radius20: 20px;
+  --dim-radius24: 24px;
+  --dim-radius28: 28px;
+  --dim-radius-full: 999px;
+
+  /* Elevation */
+  --dim-elevation0: 0px;
+  --dim-elevation1: 1px;
+  --dim-elevation2: 2px;
+  --dim-elevation4: 4px;
+  --dim-elevation8: 8px;
+
+  /* Blur */
+  --dim-blur-sigma8: 8px;
+
+  /* Icon sizes */
+  --dim-icon10: 10px;
+  --dim-icon12: 12px;
+  --dim-icon14: 14px;
+  --dim-icon18: 18px;
+  --dim-icon16: 16px;
+  --dim-icon20: 20px;
+  --dim-icon24: 24px;
+  --dim-icon28: 28px;
+  --dim-icon30: 30px;
+  --dim-icon32: 32px;
+  --dim-icon34: 34px;
+  --dim-icon36: 36px;
+  --dim-icon40: 40px;
+  --dim-icon48: 48px;
+  --dim-icon56: 56px;
+  --dim-icon80: 80px;
+  --dim-icon90: 90px;
+  --dim-icon100: 100px;
+
+  /* Page layout */
+  --dim-page-horizontal-padding: 16px;
+  --dim-page-vertical-padding: 10px;
+  --dim-page-horizontal-only: 20px;
+
+  /* Breakpoints */
+  --dim-tablet-min-shortest-side: 600px;
+  --dim-content-max-width: 720px;
+  --dim-grid-tile-max-extent: 200px;
+
+  /* Component heights */
+  --dim-input-height: 44px;
+  --dim-button-height: 48px;
+  --dim-button-height-small: 40px;
+  --dim-button-height-pill: 34px;
+  --dim-chip-height: 29px;
+  --dim-sheet-handle-width: 58px;
+  --dim-sheet-handle-height: 4px;
+  --dim-app-bar-height: 56px;
+  --dim-app-bar-action-width: 48px;
+  --dim-tab-bar-height: 56px;
+  --dim-bottom-nav-height: 65px;
+  --dim-sized-box30: 30px;
+
+  /* Border widths */
+  --dim-border-width-hairline: 0.5px;
+  --dim-border-width-thin: 1px;
+  --dim-border-width-medium: 1.5px;
+  --dim-border-width-thick: 2px;
+  --dim-border-width-extra-thick: 3px;
+
+  /* Flag display */
+  --dim-flag-height-ratio: 1.8px;
+
+  /* Feature-specific */
+  --dim-otp-box-width: 55px;
+  --dim-otp-box-height: 65px;
+  --dim-banner-height: 170px;
+  --dim-membership-card-height: 135px;
+  --dim-voucher-banner-height: 120px;
+  --dim-qa-container-size: 72px;
+  --dim-qa-icon-size: 35px;
+  --dim-logo-size: 135px;
+  --dim-brand-logo-size: 36px;
+  --dim-payment-preview-logo-max-width: 64px;
+  --dim-voucher-image-height: 190px;
+  --dim-voucher-detail-banner-height: 220px;
+  --dim-button-label-font-size: 15px;
+  --dim-reward-detail-banner-height: 220px;
+  --dim-voucher-member-card-height: 90px;
+  --dim-membership-tier-card-height: 236px;
+  --dim-membership-earning-card-height: 320px;
+  --dim-membership-progress-bar-height: 8px;
+  --dim-illustration-size: 120px;
+  --dim-badge-check-size: 82px;
+  --dim-success-badge-size: 250px;
+  --dim-search-card-image-height: 180px;
+  --dim-search-product-card-info-height: 120px;
+  --dim-search-clinic-card-info-height: 128px;
+  --dim-notification-counter-size: 22px;
+  --dim-chat-order-thumb-size: 48px;
+  --dim-skeleton-line-wide: 120px;
+  --dim-skeleton-line-short: 80px;
+  --dim-search-food-card-info-height: 108px;
+  --dim-search-treatment-card-info-height: 80px;
+  --dim-promotion-card-image-height: 200px;
+  --dim-promotion-detail-banner-height: 250px;
+  --dim-icon-bubble: 40px;
+  --dim-clinic-card-image-width: 96px;
+  --dim-clinic-expert-photo-width: 132px;
+  --dim-clinic-expert-photo-height: 176px;
+  --dim-clinic-review-clinic-thumb: 72px;
+  --dim-clinic-review-photo-thumb: 44px;
+  --dim-clinic-review-detail-photo-thumb: 56px;
+  --dim-clinic-card-height: 160px;
+  --dim-clinic-list-search-bar-height: 36px;
+
+  /* Brand card */
+  --dim-brand-card-list-height: 130px;
+  --dim-brand-card-content-width-list: 0.575;
+  --dim-brand-card-photo-width-list: 0.45;
+  --dim-brand-card-photo-width-grid: 0.55;
+  --dim-brand-card-photo-fade-start: 0.55;
+  --dim-brand-card-photo-fade-bottom-start: 0.4;
+  --dim-brand-card-photo-fade-bottom-end: 0.75;
+  --dim-brand-card-overlay-height-grid: 0.7;
+  --dim-brand-card-veil-start: 0.1;
+  --dim-brand-card-veil-mid: 0.42;
+  --dim-brand-card-veil-mid-alpha: 0.78;
+  --dim-brand-card-veil-alpha: 0.96;
+  --dim-brand-card-logo-width-list: 60px;
+  --dim-brand-card-logo-height-list: 26px;
+  --dim-brand-card-logo-width-grid: 56px;
+  --dim-brand-card-logo-height-grid: 18px;
+
+  /* Questionnaire */
+  --dim-questionnaire-progress-height: 6px;
+  --dim-questionnaire-result-photo-height: 320px;
+  --dim-questionnaire-result-bar-height: 10px;
+  --dim-questionnaire-result-marker-size: 10px;
+  --dim-questionnaire-radio-dot: 8px;
+
+  /* Skin analysis entry card */
+  --dim-skin-analysis-card-height: 84px;
+  --dim-skin-analysis-card-image-width: 104px;
+
+  /* Shop redesign */
+  --dim-shop-carousel-card-width-factor: 0.45;
+  --dim-shop-carousel-card-min-width: 150px;
+  --dim-shop-carousel-card-max-width: 200px;
+  --dim-shop-new-product-image-height: 190px;
+  --dim-shop-countdown-box-width: 26px;
+
+  /* Shop product detail */
+  --dim-shop-detail-hero-height: 320px;
+  --dim-shop-detail-thumbnail-size: 60px;
+  --dim-shop-detail-store-avatar-size: 48px;
+  --dim-shop-detail-review-photo-size: 72px;
+  --dim-shop-variant-tile-width: 96px;
+
+  /* Brand shop detail */
+  --dim-brand-shop-nav-bar-height: 64px;
+  --dim-brand-shop-products-header-height: 92px;
+  --dim-brand-shop-countdown-box-width: 44px;
+  --dim-brand-shop-mega-sale-title-width: 150px;
+  --dim-brand-shop-mega-sale-card-overhang: 12px;
+
+  /* Location pinpoint modal */
+  --dim-location-pinpoint-map-height: 350px;
+  --dim-location-pinpoint-address-box-height: 72px;
+  --dim-location-pinpoint-modal-horizontal-inset: 16px;
+  --dim-location-pinpoint-modal-vertical-inset: 60px;
+
+  /* Booking review & rating */
+  --dim-review-step-bubble-size: 22px;
+  --dim-review-star-large: 38px;
+  --dim-review-feedback-height: 190px;
+  --dim-review-add-photo-size: 62px;
+
+  /* Opacity */
+  --dim-opacity-disabled: 0.4;
+}
+
+:root {
+  --shadow-card: 0px 2px 8px var(--color-shadow);
+  --shadow-subtle: 0px 1px 4px var(--color-shadow);
+  --shadow-elevated: 0px 4px 16px var(--color-shadow);
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  --rw-bg: var(--color-background);
+  --rw-surface: #fff;
+  --rw-surface2: var(--color-grey-bg);
+  --rw-border: var(--color-divider);
+  --rw-ink: var(--color-text-near-black);
+  --rw-body: var(--color-text-primary);
+  --rw-muted: var(--color-text-secondary);
+  --rw-hint: var(--color-text-hint);
+  --rw-accent: var(--color-primary);
+  --rw-soft: var(--color-primary-light);
+  --rw-accent-ink: var(--color-green-k800);
+  --rw-btn: var(--color-primary-dark);
+  --rw-btn-hover: var(--color-green-k800);
+  --rw-btn-fg: #fff;
+  --rw-chrome: var(--color-grey-bg);
+  --rw-code: #f4f8f7;
+  --rw-off: var(--color-grey300);
+  --rw-err-soft: var(--color-error-light);
+  --rw-err: var(--color-error-dark);
+  --rw-scrim: rgba(20, 30, 30, 0.35);
+  --rw-frame: #dfe3e6;
+  --rw-pop: 0 12px 32px rgba(0, 0, 0, 0.14);
+  background: var(--rw-frame);
+  color: var(--rw-body);
+}
+
+body.rw-dark {
+  --rw-bg: #0e1313;
+  --rw-surface: #161c1d;
+  --rw-surface2: #20282a;
+  --rw-border: #2c3638;
+  --rw-ink: #eef3f3;
+  --rw-body: #d3dadb;
+  --rw-muted: #98a3a5;
+  --rw-hint: #6f7a7c;
+  --rw-soft: #0f3b3b;
+  --rw-accent-ink: #5fe0dc;
+  --rw-btn: #01afaf;
+  --rw-btn-hover: #1ee3dc;
+  --rw-btn-fg: #052b2b;
+  --rw-chrome: #1b2223;
+  --rw-code: #0f1516;
+  --rw-off: #3a4547;
+  --rw-err-soft: #3a161b;
+  --rw-err: #ff8a9a;
+  --rw-scrim: rgba(0, 0, 0, 0.6);
+  --rw-frame: #080b0b;
+  --rw-pop: 0 12px 32px rgba(0, 0, 0, 0.5);
+}

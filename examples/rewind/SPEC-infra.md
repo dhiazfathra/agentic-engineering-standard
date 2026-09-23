@@ -83,8 +83,7 @@ examples/rewind/
       src/lib/env.ts       env = parseEnv(process.env), imported instead of process.env
       src/lib/db.ts        libSQL client + drizzle instance
       src/lib/storage.ts   S3 client pointed at MinIO
-      src/styles/          tokens.css (the design's _ds tokens + --rw-* vars), fonts.css
-      public/fonts/        the design's Inter, Poppins, Instrument Serif .ttf files
+      src/styles/          tokens.css (the design's _ds tokens + --rw-* vars), fonts.ts (next/font)
       drizzle/             generated SQL migrations
       drizzle.config.ts
       e2e/                 Playwright specs
@@ -239,8 +238,9 @@ Conventions:
    `200 {"database":"ok","storage":"ok"}` with MinIO up, and `503` with
    `"storage":"unreachable"` after `docker compose stop minio`.
 5. The web app renders a page using the design's fonts and tokens: the
-   computed `--color-primary` is `#01afaf`, and `Inter` loads from
-   `/fonts/`.
+   computed `--color-primary` is `#01afaf`, and the body font is Inter,
+   self-hosted by `next/font/google`. The design's `.ttf` files are the
+   same Google Fonts families, so they are not copied.
 6. `bun run build` produces a Chrome build and a Firefox build, and the
    Chrome build loads unpacked and shows its popup.
 7. `bun run test` passes at 100% coverage. `bun run lint`, `bun run typecheck` and

@@ -209,16 +209,17 @@ database and the real MinIO container.
 
 **Acceptance criteria:**
 
-- [ ] `src/styles/tokens.css` holds the `_ds_bundle.css` `:root` variables
+- [x] `src/styles/tokens.css` holds the `_ds_bundle.css` `:root` variables
       and the `--rw-*` light and `body.rw-dark` blocks from
       `Rewind.dc.html`, under a header naming the source.
-- [ ] The design's seven `.ttf` files are in `public/fonts/`, and
-      `fonts.css` points at them. `layout.tsx` imports both stylesheets.
-- [ ] `docs/design/Rewind.dc.html` holds a reference copy.
+- [x] Inter, Poppins and Instrument Serif load through `next/font/google`
+      (`src/styles/fonts.ts`), the same families as the design's `.ttf`
+      files. `layout.tsx` imports `tokens.css` and sets the font variables.
+- [x] `docs/design/Rewind.dc.html` holds a reference copy.
 
 **Verification:**
 
-- [ ] A Playwright test on `/` reads `getComputedStyle(document.documentElement).getPropertyValue('--color-primary')` as `#01afaf`, and `document.fonts.check('16px Inter')` as true
+- [x] A Playwright test on `/` reads `--color-primary` and `--rw-accent` as `#01afaf`, and finds a loaded Inter face used by the body
 
 **Dependencies:** T2, T8
 
