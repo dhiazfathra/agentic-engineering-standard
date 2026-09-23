@@ -234,15 +234,15 @@ confirm that the Firefox build exists.
 
 **Acceptance criteria:**
 
-- [ ] A Playwright persistent context launches Chromium with
+- [x] A Playwright persistent context launches Chromium with
       `--load-extension=.output/chrome-mv3`, reads the extension id from
       the service worker, opens `popup.html` and sees `rewind`.
-- [ ] `bun run --filter extension build` also produces the Firefox
+- [x] `bun run --filter extension build` also produces the Firefox
       output. The test fails if that output is missing.
 
 **Verification:**
 
-- [ ] `bun run --filter extension e2e` exits 0
+- [x] `bun run --filter extension e2e` exits 0
 
 **Dependencies:** T3
 
@@ -252,8 +252,8 @@ confirm that the Firefox build exists.
 
 ## Checkpoint C: after T8 to T10
 
-- [ ] `bun run e2e` exits 0. Spec success criteria 5 and 6 hold
-- [ ] Commit `test(rewind): add health, design and extension e2e` and push
+- [x] `bun run e2e` exits 0. Spec success criteria 5 and 6 hold
+- [x] Commit `test(rewind): add health, design and extension e2e` and push
 
 ## T11: Vercel project `rewind` and first deploy
 

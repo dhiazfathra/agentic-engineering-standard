@@ -11,13 +11,15 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "e2e": "bun run build && playwright test"
   },
   "dependencies": {
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitest/coverage-v8": "5.0.1",
