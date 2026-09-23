@@ -1,4 +1,4 @@
-# agentic-engineering-standard
+# Agentic Engineering Standard
 
 This repo holds two templates for agentic engineering projects that learn
 from their own use. It also holds real projects cloned from them.
