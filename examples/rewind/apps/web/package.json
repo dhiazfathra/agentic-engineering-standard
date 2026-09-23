@@ -11,6 +11,7 @@
     "test": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "bun src/db/seed-cli.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

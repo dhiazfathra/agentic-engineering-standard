@@ -13,6 +13,7 @@
     "lint": "bun run --filter '*' lint",
     "typecheck": "bun run --filter '*' typecheck",
     "build": "bun run --filter './apps/*' build",
-    "db:migrate": "bun run --filter web db:migrate"
+    "db:migrate": "bun run --filter web db:migrate",
+    "db:seed": "bun run --filter web db:seed"
   }
 }
