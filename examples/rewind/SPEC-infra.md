@@ -79,7 +79,8 @@ examples/rewind/
   apps/
     web/                   Next.js 16.3.6
       src/app/             routes; api/health/route.ts is the only one in infra
-      src/lib/env.ts       zod-parsed env, imported instead of process.env
+      src/lib/parse-env.ts zod schema; parseEnv(source) is pure, so drizzle.config.ts reuses it
+      src/lib/env.ts       env = parseEnv(process.env), imported instead of process.env
       src/lib/db.ts        libSQL client + drizzle instance
       src/lib/storage.ts   S3 client pointed at MinIO
       src/styles/          tokens.css (the design's _ds tokens + --rw-* vars), fonts.css

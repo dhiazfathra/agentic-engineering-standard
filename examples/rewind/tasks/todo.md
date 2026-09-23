@@ -109,16 +109,16 @@ pipeline that works on a local file and on Turso cloud.
 
 **Acceptance criteria:**
 
-- [ ] `src/lib/db.ts` builds the client from `env.DATABASE_URL` and
+- [x] `src/lib/db.ts` builds the client from `env.DATABASE_URL` and
       `env.DATABASE_AUTH_TOKEN`, and imports `server-only`.
-- [ ] `drizzle.config.ts` uses the `turso` dialect. `src/db/schema.ts` exists,
+- [x] `drizzle.config.ts` uses the `turso` dialect. `src/db/schema.ts` exists,
       empty until `rewinds-api`.
-- [ ] `db:migrate` runs `drizzle-kit migrate`.
+- [x] `db:migrate` runs `drizzle-kit migrate`.
 
 **Verification:**
 
-- [ ] `bun run db:migrate` exits 0 against `file:local.db`
-- [ ] A unit test runs `select 1` through `db` on an in-memory libSQL database
+- [x] `bun run db:migrate` exits 0 against `file:local.db`
+- [x] A unit test runs `select 1` through `db` on an in-memory libSQL database
 
 **Dependencies:** T4
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEnv } from "./env";
+import { parseEnv } from "./parse-env";
 
 const valid = {
   DATABASE_URL: "file:local.db",
