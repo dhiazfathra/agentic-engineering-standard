@@ -14,6 +14,25 @@ commands. A command it does not list does not exist yet. Do not guess one.
 - Ask before changing a DB schema, public API, or CI.
 - Run the tests and the linter before calling work done.
 
+## Finishing work
+
+Every piece of work follows these steps, in this order:
+
+1. Commit each logical change on its own as soon as its tests pass, and
+   push it. Do not batch unrelated changes or hold commits until the end.
+2. Run `/security-review` on the changed code. Fix each finding, or
+   record why it does not apply.
+3. Run `/performance` on the changed code. Fix each finding with a
+   measurement, or record why it does not apply.
+4. Run `/documentation-and-adrs`. Update the README and every doc the
+   work made stale. Record each decision that is expensive to reverse as
+   an ADR in `docs/adr/NNNN-title.md`. Never rewrite an accepted ADR.
+   Supersede it with a new one.
+5. Commit and push the fixes and docs from steps 2 to 4 as atomic commits.
+
+If one of these skills is not installed, say so. Do not skip the step
+silently.
+
 ## Learning loop
 
 This project improves its own rules. Every session with changes ends with

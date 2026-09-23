@@ -35,3 +35,5 @@ cloned from them. `CLAUDE.md` is a symlink to this file.
   each example by hand when it matters.
 - When you change the hook or the clone script, update `tests/run.sh` in
   the same change.
+- Work in this repo ends with the "Finishing work" steps in
+  `templates/agnostic/AGENTS.md`. Monorepo decisions go in `docs/adr/`.

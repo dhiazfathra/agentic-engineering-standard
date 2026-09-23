@@ -18,6 +18,7 @@ templates/opinionated/     overlay on agnostic: Next.js on Vercel, Turso, MinIO
   docs/diagrams/           stack comparison behind the choice
   .gitignore.append        Next.js ignores, appended to the base .gitignore
 examples/rewind/           working example and case study, built from opinionated
+docs/adr/                  architecture decision records for this repo
 scripts/new-project.sh     clones a template
 tests/run.sh               tests for the script and the hook
 ```
@@ -36,6 +37,20 @@ fill in `docs/STACK.md`.
 To add another opinionated template, create `templates/<name>/` with only
 the files that differ from the agnostic base. The script picks it up from
 the directory.
+
+## Finishing work
+
+Every project, and this repo, ends each piece of work the same way. The
+steps are in `templates/agnostic/AGENTS.md`:
+
+1. Commit and push each logical change on its own, as soon as it passes.
+2. Harden with `/security-review` and `/performance`.
+3. Bring the README, docs, and ADRs up to date with `/documentation-and-adrs`.
+4. Commit and push the results.
+
+The three skills are not in the template. Install them in `~/.claude/skills`.
+
+Decisions for this repo are in [`docs/adr/`](docs/adr/).
 
 ## The learning loop
 
