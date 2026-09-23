@@ -26,7 +26,10 @@ describe("POST /api/uploads", () => {
     expect(presign).toHaveBeenCalledWith(
       {},
       expect.any(Object),
-      expect.objectContaining({ expiresIn: 900 }),
+      expect.objectContaining({
+        expiresIn: 900,
+        signableHeaders: new Set(["content-type"]),
+      }),
     );
   });
 

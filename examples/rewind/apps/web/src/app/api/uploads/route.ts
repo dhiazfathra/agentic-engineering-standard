@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       Key: key,
       ContentType: parsed.contentType,
     }),
-    { expiresIn: 900 },
+    { expiresIn: 900, signableHeaders: new Set(["content-type"]) },
   );
 
   return NextResponse.json({ url, key });
