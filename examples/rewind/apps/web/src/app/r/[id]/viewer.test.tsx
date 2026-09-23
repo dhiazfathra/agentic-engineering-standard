@@ -218,7 +218,7 @@ describe("seeking", () => {
     mount(
       <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
     );
-    const step = qAll('[class*="step"]').find((r) =>
+    const step = qAll('[data-testid="step"]').find((r) =>
       r.textContent?.includes("Navigated to /cart"),
     )!;
     click(step);

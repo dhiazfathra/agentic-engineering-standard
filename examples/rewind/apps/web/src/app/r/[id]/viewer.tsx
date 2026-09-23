@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RewindStatus } from "@rewind/schema";
 import type { RewindDetail } from "@/lib/rewinds";
 import {
@@ -71,11 +71,24 @@ export function Viewer({ rewind, mediaUrl }: Props) {
   const [authorName, setAuthorName] = useState(() => readStoredAuthor());
   const [toast, setToast] = useState<Toast | null>(null);
   const mediaRef = useRef<HTMLVideoElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const duration = rewind.durationSeconds ?? 0;
   const isVideo = rewind.kind === "video";
   const events = rewind.events;
+
+  // Assigned after mount, once the onError listener above is attached, so a
+  // fast local error (this is what happens for every seeded Rewind, whose
+  // mediaKey never has a stored object) is never missed. Media "error"
+  // events do not bubble, so React's delegated listener must already be on
+  // the element before the browser starts the request.
+  useEffect(() => {
+    // mediaError is false on the mount this effect runs after, so the
+    // matching ref (video or img) is always attached to its element here.
+    if (isVideo) mediaRef.current!.src = mediaUrl;
+    else imgRef.current!.src = mediaUrl;
+  }, [isVideo, mediaUrl]);
 
   const showToast = (next: Toast) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -251,7 +264,6 @@ export function Viewer({ rewind, mediaUrl }: Props) {
               <video
                 ref={mediaRef}
                 className={styles.media}
-                src={mediaUrl}
                 onTimeUpdate={(e) => setT(e.currentTarget.currentTime)}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
@@ -259,11 +271,15 @@ export function Viewer({ rewind, mediaUrl }: Props) {
               />
             ) : (
               // A presigned MinIO URL: unknown at build time, so next/image's
-              // static optimization does not apply.
+              // static optimization does not apply. The `src` is assigned
+              // imperatively below, after the error listener is attached, so
+              // an error the browser raises during a server-rendered
+              // hydration race is never missed (media "error" events do not
+              // bubble, so React must have the listener attached first).
               // eslint-disable-next-line @next/next/no-img-element
               <img
+                ref={imgRef}
                 className={styles.media}
-                src={mediaUrl}
                 alt={rewind.title}
                 onError={() => setMediaError(true)}
               />
@@ -472,6 +488,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                     <button
                       key={s.n}
                       type="button"
+                      data-testid="step"
                       className={styles.step}
                       onClick={() => seek(s.t)}
                     >
@@ -529,6 +546,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                     <button
                       key={e.id}
                       type="button"
+                      data-testid="event-row"
                       className={styles.eventRow}
                       style={{
                         background:
@@ -559,6 +577,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                   <button
                     key={c.id}
                     type="button"
+                    data-testid="comment-row"
                     className={styles.commentRow}
                     onClick={() => seek(c.t)}
                   >
