@@ -56,4 +56,8 @@ test("uploads to MinIO, creates and fetches a Rewind, then deletes it", async ({
 
   const deleteRes = await request.delete(`/api/rewinds/${rewind.id}`);
   expect(deleteRes.status()).toBe(200);
+
+  await expect(
+    s3.send(new HeadObjectCommand({ Bucket: localEnv.S3_BUCKET, Key: key })),
+  ).rejects.toThrow();
 });
