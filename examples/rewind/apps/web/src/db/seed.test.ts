@@ -103,4 +103,62 @@ describe("seed", () => {
     expect(found?.events).toHaveLength(13);
     expect(found?.comments).toHaveLength(2);
   });
+
+  it("re-seeding keeps user-added rows and doesn't null out user data", async () => {
+    async function rowCounts() {
+      return {
+        folders: (await db.select().from(folders)).length,
+        recordingLinks: (await db.select().from(recordingLinks)).length,
+        rewinds: (await db.select().from(rewinds)).length,
+        events: (await db.select().from(events)).length,
+        comments: (await db.select().from(comments)).length,
+      };
+    }
+
+    await seed(db, new Date());
+    const before = await rowCounts();
+
+    await db.insert(comments).values({
+      id: "user-comment-on-seed-r1",
+      rewindId: "seed-r1",
+      t: 1,
+      x: 0,
+      y: 0,
+      author: "user",
+      text: "user comment",
+      createdAt: new Date(),
+    });
+    await db.insert(rewinds).values({
+      id: "user-rewind-in-seed-folder",
+      title: "user rewind",
+      url: "https://example.com",
+      reporterName: "user",
+      kind: "video",
+      mediaKey: "rewinds/user-rewind.webm",
+      durationSeconds: 1,
+      folderId: "seed-folder-checkout",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await seed(db, new Date());
+    const after = await rowCounts();
+
+    // Seed row counts are unchanged; only the two user-added rows are extra.
+    expect(after).toEqual({
+      ...before,
+      rewinds: before.rewinds + 1,
+      comments: before.comments + 1,
+    });
+
+    const userComment = await db.query.comments.findFirst({
+      where: eq(comments.id, "user-comment-on-seed-r1"),
+    });
+    expect(userComment).toBeDefined();
+
+    const userRewind = await db.query.rewinds.findFirst({
+      where: eq(rewinds.id, "user-rewind-in-seed-folder"),
+    });
+    expect(userRewind?.folderId).toBe("seed-folder-checkout");
+  });
 });

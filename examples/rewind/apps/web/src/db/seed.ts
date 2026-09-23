@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import { comments, events, folders, recordingLinks, rewinds } from "./schema";
 import type * as schema from "./schema";
@@ -181,6 +181,9 @@ export function buildSeedRows(now: Date): SeedRows {
       reporterName: j.by,
       status: j.status,
       kind: isScreenshot ? ("screenshot" as const) : ("video" as const),
+      // Sample data only: no object exists in storage at this key (seed has
+      // no S3 dependency), so the viewer must render a missing-media state
+      // for seeded Rewinds.
       mediaKey: `rewinds/seed-${j.id}.${isScreenshot ? "png" : "webm"}`,
       durationSeconds: isScreenshot ? null : parseDuration(j.dur),
       folderId: FOLDER_IDS[j.folder],
@@ -219,45 +222,77 @@ export function buildSeedRows(now: Date): SeedRows {
   };
 }
 
-/** Idempotent: deletes the seed rows by id, then inserts them, in one batch. */
+/**
+ * Idempotent: upserts the seed rows by their fixed ids, in one batch.
+ *
+ * Upsert (not delete-then-insert) so re-seeding doesn't cascade away
+ * user-added comments/events on seeded Rewinds, or null out user Rewinds'
+ * folderId via the folders FK's ON DELETE SET NULL.
+ */
 export async function seed(db: Db, now: Date): Promise<void> {
   const rows = buildSeedRows(now);
 
   await db.batch([
-    db.delete(comments).where(
-      inArray(
-        comments.id,
-        rows.comments.map((r) => r.id as string),
-      ),
-    ),
-    db.delete(events).where(
-      inArray(
-        events.id,
-        rows.events.map((r) => r.id as string),
-      ),
-    ),
-    db.delete(rewinds).where(
-      inArray(
-        rewinds.id,
-        rows.rewinds.map((r) => r.id as string),
-      ),
-    ),
-    db.delete(recordingLinks).where(
-      inArray(
-        recordingLinks.id,
-        rows.recordingLinks.map((r) => r.id as string),
-      ),
-    ),
-    db.delete(folders).where(
-      inArray(
-        folders.id,
-        rows.folders.map((r) => r.id as string),
-      ),
-    ),
-    db.insert(folders).values(rows.folders),
-    db.insert(recordingLinks).values(rows.recordingLinks),
-    db.insert(rewinds).values(rows.rewinds),
-    db.insert(events).values(rows.events),
-    db.insert(comments).values(rows.comments),
+    db
+      .insert(folders)
+      .values(rows.folders)
+      .onConflictDoUpdate({
+        target: folders.id,
+        set: { name: sql`excluded.name`, createdAt: sql`excluded.createdAt` },
+      }),
+    db
+      .insert(recordingLinks)
+      .values(rows.recordingLinks)
+      .onConflictDoUpdate({
+        target: recordingLinks.id,
+        set: { name: sql`excluded.name`, createdAt: sql`excluded.createdAt` },
+      }),
+    db
+      .insert(rewinds)
+      .values(rows.rewinds)
+      .onConflictDoUpdate({
+        target: rewinds.id,
+        set: {
+          title: sql`excluded.title`,
+          url: sql`excluded.url`,
+          reporterName: sql`excluded.reporterName`,
+          status: sql`excluded.status`,
+          kind: sql`excluded.kind`,
+          mediaKey: sql`excluded.mediaKey`,
+          durationSeconds: sql`excluded.durationSeconds`,
+          folderId: sql`excluded.folderId`,
+          recordingLinkId: sql`excluded.recordingLinkId`,
+          createdAt: sql`excluded.createdAt`,
+          updatedAt: sql`excluded.updatedAt`,
+        },
+      }),
+    db
+      .insert(events)
+      .values(rows.events)
+      .onConflictDoUpdate({
+        target: events.id,
+        set: {
+          rewindId: sql`excluded.rewindId`,
+          t: sql`excluded.t`,
+          kind: sql`excluded.kind`,
+          text: sql`excluded.text`,
+          isError: sql`excluded.isError`,
+        },
+      }),
+    db
+      .insert(comments)
+      .values(rows.comments)
+      .onConflictDoUpdate({
+        target: comments.id,
+        set: {
+          rewindId: sql`excluded.rewindId`,
+          t: sql`excluded.t`,
+          x: sql`excluded.x`,
+          y: sql`excluded.y`,
+          author: sql`excluded.author`,
+          text: sql`excluded.text`,
+          createdAt: sql`excluded.createdAt`,
+        },
+      }),
   ]);
 }
