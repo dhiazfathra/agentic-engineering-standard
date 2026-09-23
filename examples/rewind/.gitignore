@@ -11,6 +11,7 @@
 !.claude/settings.json
 !.claude/hooks/
 !.claude/skills/
+!.claude/agents/
 
 # Next.js / Vercel
 node_modules/

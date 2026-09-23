@@ -17,6 +17,14 @@ commands. A command it does not list does not exist yet. Do not guess one.
 - Ask before changing a DB schema, public API, or CI.
 - Run the tests and the linter before calling work done.
 
+## Models
+
+Opus plans. Cheaper models do the work. On Opus, write the plan or spec,
+then delegate: the `worker` subagent (Sonnet, low effort) implements
+tasks, and the `chore` subagent (Haiku, low effort) commits, pushes,
+renames, and moves. `.claude/hooks/opus-delegates.sh` blocks Opus from
+code edits, those chores, and other subagents. Markdown stays open.
+
 ## Finishing work
 
 Every piece of work follows these steps, in this order:

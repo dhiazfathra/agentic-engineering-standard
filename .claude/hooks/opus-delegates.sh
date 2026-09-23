@@ -1,0 +1,1 @@
+../../templates/agnostic/.claude/hooks/opus-delegates.sh

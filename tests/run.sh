@@ -47,7 +47,7 @@ check "records opinionated origin" grep -q 'from the .opinionated. template' "$o
 check "overlay adds bun-only hook" test -x "$op/.claude/hooks/bun-only.sh"
 # shellcheck disable=SC2016 # jq variables, not shell
 check "overlay settings keep base hooks" jq -e --slurpfile b "$repo/templates/agnostic/.claude/settings.json" \
-	'.hooks.SessionStart == $b[0].hooks.SessionStart and .hooks.Stop == $b[0].hooks.Stop' "$op/.claude/settings.json" >/dev/null
+	'.hooks.SessionStart == $b[0].hooks.SessionStart and .hooks.Stop == $b[0].hooks.Stop and (.hooks.PreToolUse | contains($b[0].hooks.PreToolUse))' "$op/.claude/settings.json" >/dev/null
 check "overlay settings wire bun-only" jq -e '.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command | endswith("bun-only.sh")' "$op/.claude/settings.json" >/dev/null
 check "ignores foreign lockfiles" grep -qx 'pnpm-lock.yaml' "$op/.gitignore"
 
@@ -65,6 +65,40 @@ for c in 'bun install' 'bunx next dev' 'grep -r npm .' 'ls ~/npm-cache' 'bun add
 	check "bun-only allows: $c" bun_run "$c"
 done
 check "bun-only allows non-Bash input" bash -c "echo '{}' | '$bun_hook'"
+
+# --- opus-delegates.sh ---
+od_hook=$repo/templates/agnostic/.claude/hooks/opus-delegates.sh
+check "copies worker and chore agents" bash -c "grep -q '^model: sonnet' '$tmp/examples/demo/.claude/agents/worker.md' && grep -q '^model: haiku' '$tmp/examples/demo/.claude/agents/chore.md'"
+check "agents run at low effort" bash -c "grep -q '^effort: low' '$tmp/examples/demo/.claude/agents/worker.md' && grep -q '^effort: low' '$tmp/examples/demo/.claude/agents/chore.md'"
+check "keeps .claude/agents visible" bash -c "cd '$tmp/examples/demo' && git init -q && ! git check-ignore -q .claude/agents/worker.md"
+check "agnostic settings wire opus-delegates" jq -e '.hooks.PreToolUse[].hooks[].command | endswith("opus-delegates.sh")' "$repo/templates/agnostic/.claude/settings.json" >/dev/null
+echo '{"type":"assistant","message":{"model":"claude-opus-5-5"}}' >"$tmp/opus.jsonl"
+echo '{"type":"assistant","message":{"model":"claude-sonnet-5"}}' >"$tmp/sonnet.jsonl"
+# shellcheck disable=SC2329 # both are called through check
+od_run() { # transcript, tool name, tool_input JSON, then an optional agent_id
+	jq -n --arg t "$tmp/$1.jsonl" --arg n "$2" --argjson i "$3" --arg a "${4:-}" \
+		'{transcript_path: $t, tool_name: $n, tool_input: $i} + (if $a == "" then {} else {agent_id: $a} end)' | "$od_hook" 2>/dev/null
+}
+# shellcheck disable=SC2329
+od_blocks() { ! od_run "$@"; }
+check "opus blocks code edit" od_blocks opus Edit '{"file_path":"src/app.ts"}'
+check "opus blocks code write" od_blocks opus Write '{"file_path":"a.sh"}'
+check "opus blocks notebook edit" od_blocks opus NotebookEdit '{"notebook_path":"n.ipynb"}'
+check "opus allows plan Markdown" od_run opus Write '{"file_path":"docs/plan.md"}'
+for c in 'git commit -m x' 'git add . && git push' 'git mv a b' 'mv a b'; do
+	check "opus blocks: $c" od_blocks opus Bash "$(jq -n --arg c "$c" '{command: $c}')"
+done
+for c in 'git status' 'bash tests/run.sh' 'grep -r "git commit" .'; do
+	check "opus allows: $c" od_run opus Bash "$(jq -n --arg c "$c" '{command: $c}')"
+done
+check "opus blocks default subagent" od_blocks opus Agent '{"subagent_type":"general-purpose"}'
+check "opus blocks untyped subagent" od_blocks opus Agent '{}'
+for a in worker chore Explore; do
+	check "opus allows $a subagent" od_run opus Agent "{\"subagent_type\":\"$a\"}"
+done
+check "sonnet edits freely" od_run sonnet Edit '{"file_path":"src/app.ts"}'
+check "subagent under opus edits freely" od_run opus Edit '{"file_path":"src/app.ts"}' agent-1
+check "allows without transcript" bash -c "echo '{\"tool_name\":\"Edit\"}' | '$od_hook'"
 
 # --- learn-nudge.sh ---
 proj=$tmp/proj
@@ -100,7 +134,7 @@ mkdir -p "$proj/learning" && touch "$proj/learning/MEMORY.md"
 check "silent once session touched learning/" test -z "$(run_hook "$sid")"
 
 # --- repo root runs the agnostic loop through symlinks ---
-for f in hooks/learn-nudge.sh settings.json skills/learn; do
+for f in hooks/learn-nudge.sh hooks/opus-delegates.sh settings.json skills/learn agents; do
 	check "root .claude/$f links to agnostic" test "$repo/.claude/$f" -ef "$repo/templates/agnostic/.claude/$f"
 done
 check "root has learning/" test -f "$repo/learning/LESSONS.md" -a -f "$repo/learning/MEMORY.md"

@@ -12,7 +12,9 @@ templates/agnostic/        stack-agnostic base
   learning/MEMORY.md       durable project facts and decisions
   learning/LESSONS.md      mistakes, with evidence and a fix
   .claude/skills/learn     the learning-loop skill
-  .claude/hooks/           Stop hook that asks the agent to run the learn skill
+  .claude/hooks/           Stop hook that asks the agent to run the learn skill,
+                           and opus-delegates.sh, which makes Opus delegate the work
+  .claude/agents/          worker (Sonnet, low effort) and chore (Haiku, low effort)
 templates/opinionated/     overlay on agnostic: Next.js on Vercel, Turso, MinIO, bun
   docs/STACK.md            the chosen stack
   .claude/hooks/bun-only.sh  PreToolUse hook that blocks npm, npx, pnpm, and yarn
@@ -55,6 +57,16 @@ steps are in `templates/agnostic/AGENTS.md`:
 The three skills are not in the template. Install them in `~/.claude/skills`.
 
 Decisions for this repo are in [`docs/adr/`](docs/adr/).
+
+## Opus plans, cheaper models work
+
+On Opus, the main conversation writes the plan or spec, then delegates.
+The `worker` subagent (Sonnet, low effort) implements, and the `chore`
+subagent (Haiku, low effort) commits, pushes, renames, and moves. The
+`opus-delegates.sh` PreToolUse hook blocks Opus from non-Markdown edits,
+`git commit`, `git push`, `git mv`, `mv`, and any other subagent except
+`Explore`. Other models are not gated. Switch with `/model` to work on
+Opus directly. See [ADR-0010](docs/adr/0010-opus-plans-cheaper-models-work.md).
 
 ## The learning loop
 
