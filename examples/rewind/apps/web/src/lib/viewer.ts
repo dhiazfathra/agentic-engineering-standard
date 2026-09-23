@@ -66,7 +66,12 @@ export function stepsToReproduce(events: ViewerEvent[]): Step[] {
   }));
 }
 
-export type TimelineMarker = { t: number; leftPct: number; tone: string };
+export type TimelineMarker = {
+  id: string;
+  t: number;
+  leftPct: number;
+  tone: string;
+};
 
 /** Errors (tall, red), navigations (teal) and clicks (grey). */
 export function timelineMarkers(
@@ -76,6 +81,7 @@ export function timelineMarkers(
   return events
     .filter((e) => e.isError || e.kind === "click" || e.kind === "nav")
     .map((e) => ({
+      id: e.id,
       t: e.t,
       leftPct: duration > 0 ? (e.t / duration) * 100 : 0,
       tone: e.isError ? "error" : e.kind === "nav" ? "nav" : "click",

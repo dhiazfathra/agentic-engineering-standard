@@ -121,21 +121,21 @@ describe("stepsToReproduce", () => {
 describe("timelineMarkers", () => {
   it("errors, navs and clicks, positioned by duration", () => {
     const events = [
-      ev({ t: 10, kind: "err", isError: true }),
-      ev({ t: 20, kind: "nav" }),
-      ev({ t: 30, kind: "click" }),
+      ev({ id: "a", t: 10, kind: "err", isError: true }),
+      ev({ id: "b", t: 20, kind: "nav" }),
+      ev({ id: "c", t: 30, kind: "click" }),
       ev({ t: 40, kind: "log" }),
     ];
     expect(timelineMarkers(events, 100)).toEqual([
-      { t: 10, leftPct: 10, tone: "error" },
-      { t: 20, leftPct: 20, tone: "nav" },
-      { t: 30, leftPct: 30, tone: "click" },
+      { id: "a", t: 10, leftPct: 10, tone: "error" },
+      { id: "b", t: 20, leftPct: 20, tone: "nav" },
+      { id: "c", t: 30, leftPct: 30, tone: "click" },
     ]);
   });
 
   it("0% when duration is 0", () => {
     expect(timelineMarkers([ev({ t: 5, kind: "nav" })], 0)).toEqual([
-      { t: 5, leftPct: 0, tone: "nav" },
+      { id: "e", t: 5, leftPct: 0, tone: "nav" },
     ]);
   });
 });

@@ -68,7 +68,8 @@ export function Viewer({ rewind, mediaUrl }: Props) {
   const [commentMode, setCommentMode] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftText, setDraftText] = useState("");
-  const [authorName, setAuthorName] = useState(() => readStoredAuthor());
+  const [rememberedAuthor, setRememberedAuthor] = useState(readStoredAuthor);
+  const [authorName, setAuthorName] = useState(rememberedAuthor);
   const [toast, setToast] = useState<Toast | null>(null);
   const mediaRef = useRef<HTMLVideoElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -98,7 +99,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
 
   const seek = (next: number) => {
     const clamped = Math.max(0, Math.min(duration, next));
-    setPlaying(false);
+    mediaRef.current?.pause();
     setT(clamped);
     if (mediaRef.current && !mediaError) mediaRef.current.currentTime = clamped;
   };
@@ -143,7 +144,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
       t: Math.floor(t),
     });
     setDraftText("");
-    setPlaying(false);
+    mediaRef.current?.pause();
   };
 
   const onTimelineClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -183,6 +184,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
       const row = await res.json();
       setComments((prev) => [...prev, row]);
       storeAuthor(author);
+      setRememberedAuthor(author);
       setDraft(null);
       setDraftText("");
       setCommentMode(false);
@@ -333,7 +335,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                 <div className={styles.draftTime}>
                   Comment at {formatTime(draft.t)}
                 </div>
-                {!authorName && (
+                {!rememberedAuthor && (
                   <input
                     className={styles.draftInput}
                     placeholder="Your name"
@@ -436,7 +438,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                   />
                   {markers.map((m) => (
                     <div
-                      key={m.t}
+                      key={m.id}
                       className={styles.timelineMarker}
                       style={{
                         left: `${m.leftPct}%`,
@@ -467,7 +469,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                 onClick={() => {
                   setCommentMode((v) => !v);
                   setDraft(null);
-                  setPlaying(false);
+                  mediaRef.current?.pause();
                 }}
               >
                 {commentMode ? "Click the video…" : "Comment"}

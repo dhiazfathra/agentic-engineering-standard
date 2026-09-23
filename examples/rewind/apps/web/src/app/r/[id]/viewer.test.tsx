@@ -373,6 +373,29 @@ describe("play/pause", () => {
     expect(q('button[aria-label="Play"]')).toBeTruthy();
   });
 
+  it("pauses the media when seeking or entering comment mode while playing", () => {
+    mount(
+      <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
+    );
+    const video = q("video") as HTMLVideoElement;
+    vi.spyOn(video, "play").mockImplementation(() => {
+      act(() => video.dispatchEvent(new Event("play")));
+      return Promise.resolve();
+    });
+    const pause = vi.spyOn(video, "pause").mockImplementation(() => {
+      act(() => video.dispatchEvent(new Event("pause")));
+    });
+    click(q('button[aria-label="Play"]'));
+    click(qAll("button").find((b) => b.textContent === "+5s")!);
+    expect(pause).toHaveBeenCalledTimes(1);
+    expect(q('button[aria-label="Play"]')).toBeTruthy();
+
+    click(q('button[aria-label="Play"]'));
+    click(qAll("button").find((b) => b.textContent === "Comment")!);
+    expect(pause).toHaveBeenCalledTimes(2);
+    expect(q('button[aria-label="Play"]')).toBeTruthy();
+  });
+
   it("disables play and shows Media unavailable on media error", () => {
     mount(
       <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
@@ -409,6 +432,20 @@ describe("play/pause", () => {
     const playButton = q('button[aria-label="Play"]');
     click(playButton);
     expect(playButton.getAttribute("aria-label")).toBe("Play");
+  });
+});
+
+describe("timeline markers", () => {
+  it("renders two markers at the same second without a duplicate-key warning", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const rewind = videoRewind();
+    rewind.events = [
+      { id: "m0", t: 5, kind: "click", text: "Clicked pay", isError: false },
+      { id: "m1", t: 5, kind: "err", text: "TypeError", isError: true },
+    ] as unknown as RewindDetail["events"];
+    mount(<Viewer rewind={rewind} mediaUrl="https://example.com/v.webm" />);
+    expect(qAll('[class*="timelineMarker"]')).toHaveLength(2);
+    expect(error).not.toHaveBeenCalled();
   });
 });
 
@@ -615,8 +652,9 @@ describe("comments", () => {
         new MouseEvent("click", { bubbles: true, clientX: 10, clientY: 20 }),
       );
     });
-    const nameInput = q('input[aria-label="Your name"]') as HTMLInputElement;
-    type(nameInput, "Bob");
+    for (const partial of ["B", "Bo", "Bob"]) {
+      type(q('input[aria-label="Your name"]') as HTMLInputElement, partial);
+    }
     const textInput = q('input[aria-label="Comment text"]') as HTMLInputElement;
     type(textInput, "Hello");
     const postButton = qAll("button").find((b) => b.textContent === "Post")!;
@@ -626,6 +664,9 @@ describe("comments", () => {
       await Promise.resolve();
     });
     expect(container.textContent).toContain("Comment added");
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(JSON.parse(init!.body as string).author).toBe("Bob");
+    expect(localStorage.getItem("rewind:comment-author")).toBe("Bob");
   });
 
   it("cancels a draft", () => {
