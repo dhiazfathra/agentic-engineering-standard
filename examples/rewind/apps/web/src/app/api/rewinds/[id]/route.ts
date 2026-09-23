@@ -1,11 +1,12 @@
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { updateRewind } from "@rewind/schema";
-import { comments, events, rewinds } from "@/db/schema";
+import { rewinds } from "@/db/schema";
 import { db } from "@/lib/db";
 import { isForeignKeyViolation, parseBody } from "@/lib/http";
 import { env } from "@/lib/env";
+import { getRewind } from "@/lib/rewinds";
 import { s3 } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
-  const row = await db.query.rewinds.findFirst({
-    where: eq(rewinds.id, id),
-    with: {
-      events: { orderBy: asc(events.t) },
-      comments: { orderBy: asc(comments.t) },
-    },
-  });
+  const row = await getRewind(id);
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

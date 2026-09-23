@@ -21,6 +21,7 @@ vi.mock("@/lib/db", () => ({
     delete: mocks.delete,
   },
 }));
+vi.mock("@/lib/rewinds", () => ({ getRewind: mocks.findFirst }));
 vi.mock("@/lib/storage", () => ({ s3: { send: mocks.s3Send } }));
 
 import { DELETE, GET, PATCH } from "./route";
