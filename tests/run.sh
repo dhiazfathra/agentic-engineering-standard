@@ -85,10 +85,7 @@ check "opus blocks code edit" od_blocks opus Edit '{"file_path":"src/app.ts"}'
 check "opus blocks code write" od_blocks opus Write '{"file_path":"a.sh"}'
 check "opus blocks notebook edit" od_blocks opus NotebookEdit '{"notebook_path":"n.ipynb"}'
 check "opus allows plan Markdown" od_run opus Write '{"file_path":"docs/plan.md"}'
-for c in 'git commit -m x' 'git add . && git push' 'git mv a b' 'mv a b'; do
-	check "opus blocks: $c" od_blocks opus Bash "$(jq -n --arg c "$c" '{command: $c}')"
-done
-for c in 'git status' 'bash tests/run.sh' 'grep -r "git commit" .'; do
+for c in 'git commit -m x' 'git add . && git push' 'git mv a b' 'mv a b' 'git status' 'bash tests/run.sh' 'grep -r "git commit" .'; do
 	check "opus allows: $c" od_run opus Bash "$(jq -n --arg c "$c" '{command: $c}')"
 done
 check "opus blocks default subagent" od_blocks opus Agent '{"subagent_type":"general-purpose"}'

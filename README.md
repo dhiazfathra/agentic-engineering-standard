@@ -62,10 +62,11 @@ Decisions for this repo are in [`docs/adr/`](docs/adr/).
 
 On Opus, the main conversation writes the plan or spec, then delegates.
 The `worker` subagent (Sonnet, low effort) implements, and the `chore`
-subagent (Haiku, low effort) commits, pushes, renames, and moves. The
-`opus-delegates.sh` PreToolUse hook blocks Opus from non-Markdown edits,
-`git commit`, `git push`, `git mv`, `mv`, and any other subagent except
-`Explore`. Other models are not gated. Switch with `/model` to work on
+subagent (Haiku, low effort) takes mechanical multi-step chores. The
+`opus-delegates.sh` PreToolUse hook blocks Opus from non-Markdown edits
+and any other subagent except `Explore`. Commits, pushes, and moves stay
+direct, since one command costs less than a subagent start. Other models
+are not gated. Switch with `/model` to work on
 Opus directly. See [ADR-0010](docs/adr/0010-opus-plans-cheaper-models-work.md).
 
 ## The learning loop
