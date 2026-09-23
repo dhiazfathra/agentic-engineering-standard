@@ -86,15 +86,15 @@ placeholder. Chrome and Firefox builds come from one codebase.
 
 **Acceptance criteria:**
 
-- [ ] `src/lib/env.ts` matches the spec's code style snippet.
-- [ ] `.env.example` lists every variable, with local defaults and no
+- [x] `src/lib/env.ts` matches the spec's code style snippet.
+- [x] `.env.example` lists every variable, with local defaults and no
       secrets.
-- [ ] Tests cover a valid env, each required variable missing, and a bad
+- [x] Tests cover a valid env, each required variable missing, and a bad
       `S3_ENDPOINT`.
 
 **Verification:**
 
-- [ ] `bun run --filter web test` passes at 100%
+- [x] `bun run --filter web test` passes at 100%
 
 **Dependencies:** T2
 
