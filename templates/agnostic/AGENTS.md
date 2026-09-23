@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-`CLAUDE.md` imports this file. Edit this file only.
+`CLAUDE.md` is a symlink to this file. Edit this file only.
 
 ## Stack and commands
 

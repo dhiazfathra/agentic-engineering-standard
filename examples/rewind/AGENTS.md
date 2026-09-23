@@ -3,7 +3,7 @@
 Rewind is a bug-reporting tool built around screen recordings. It is the
 working example and case study for `../../templates/opinionated`.
 
-`CLAUDE.md` imports this file. Edit this file only.
+`CLAUDE.md` is a symlink to this file. Edit this file only.
 
 ## Stack and commands
 

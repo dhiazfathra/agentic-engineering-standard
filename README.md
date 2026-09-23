@@ -7,7 +7,7 @@ from their own use. It also holds real projects cloned from them.
 
 ```
 templates/agnostic/        stack-agnostic base
-  AGENTS.md                project rules (CLAUDE.md imports it)
+  AGENTS.md                project rules (CLAUDE.md is a symlink to it)
   docs/STACK.md            stack and commands (TBD)
   learning/MEMORY.md       durable project facts and decisions
   learning/LESSONS.md      mistakes, with evidence and a fix
