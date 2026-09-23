@@ -311,15 +311,15 @@ them to the opinionated template.
 
 **Acceptance criteria:**
 
-- [ ] With `typescript@7.0.2` in every package, `bun run typecheck`,
+- [x] With `typescript@7.0.2` in every package, `bun run typecheck`,
       `bun run build` and `bun run test` all exit 0. Then commit
       `chore(rewind): move to typescript 7`.
-- [ ] Or, if any of them fail: revert, and record the failing command and
+- [x] Or, if any of them fail: revert, and record the failing command and
       its error in `learning/LESSONS.md`.
 
 **Verification:**
 
-- [ ] `git status` is clean, whichever outcome
+- [x] `git status` is clean, whichever outcome
 
 **Dependencies:** T12
 
