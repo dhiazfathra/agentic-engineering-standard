@@ -6,7 +6,15 @@ import {
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
-import { eventKind, newId, rewindKind, rewindStatus } from "@rewind/schema";
+import {
+  type EventKind,
+  eventKind,
+  newId,
+  type RewindKind,
+  rewindKind,
+  type RewindStatus,
+  rewindStatus,
+} from "@rewind/schema";
 
 export const folders = sqliteTable("folders", {
   id: text().primaryKey().$defaultFn(newId),
@@ -31,10 +39,14 @@ export const rewinds = sqliteTable(
     title: text().notNull(),
     url: text().notNull(),
     reporterName: text().notNull(),
-    status: text({ enum: rewindStatus.options as [string, ...string[]] })
+    status: text({
+      enum: rewindStatus.options as [RewindStatus, ...RewindStatus[]],
+    })
       .notNull()
       .default("new"),
-    kind: text({ enum: rewindKind.options as [string, ...string[]] }).notNull(),
+    kind: text({
+      enum: rewindKind.options as [RewindKind, ...RewindKind[]],
+    }).notNull(),
     mediaKey: text().notNull(),
     durationSeconds: real(),
     folderId: text().references(() => folders.id, { onDelete: "set null" }),
@@ -59,7 +71,9 @@ export const events = sqliteTable(
       .notNull()
       .references(() => rewinds.id, { onDelete: "cascade" }),
     t: real().notNull(),
-    kind: text({ enum: eventKind.options as [string, ...string[]] }).notNull(),
+    kind: text({
+      enum: eventKind.options as [EventKind, ...EventKind[]],
+    }).notNull(),
     text: text().notNull(),
     isError: integer({ mode: "boolean" }).notNull(),
   },
