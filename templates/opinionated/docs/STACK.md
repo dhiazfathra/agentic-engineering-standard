@@ -15,5 +15,42 @@ without adding a second architectural seam.
 
 ## Commands
 
-TBD until the app is scaffolded. When it is, list the exact test, lint,
-build, and dev commands here and promote them to the opinionated template.
+All commands run from the project root unless noted. Pin Node in
+`.nvmrc` and run `nvm use` first — a non-interactive shell does not pick
+it up on its own.
+
+```
+Setup:      nvm use && bun install && cp .env.example apps/web/.env.local
+Infra up:   docker compose up -d        # MinIO console on :9001
+Infra down: docker compose down         # add -v to wipe the bucket
+Migrate:    bun run db:migrate          # drizzle-kit migrate against DATABASE_URL
+Dev:        bun run dev                 # next dev and wxt dev, in parallel
+Dev (FF):   bun run --filter extension dev:firefox
+Test:       bun run test                # vitest run --coverage in every package
+E2E:        bun run e2e                 # Playwright: web against next start, extension loads unpacked
+Lint:       bun run lint                # eslint . in every package
+Typecheck:  bun run typecheck           # tsc --noEmit in every package
+Build:      bun run build               # next build; wxt build (chrome-mv3, firefox-mv2)
+```
+
+## Environment
+
+List every variable in `.env.example`, with local defaults and no
+secrets. Parse `process.env` with zod at import time in one module (for
+example `src/lib/env.ts`) and import that everywhere else, so a missing
+or invalid variable fails fast with its name.
+
+Vercel cannot reach a MinIO that runs only on a dev machine: signing an
+upload or download URL is local math and works from Vercel, but a
+server-side call to MinIO (checking or deleting a blob) does not. Point
+`S3_ENDPOINT` at `http://localhost:9000` in every environment until MinIO
+moves to a reachable host, and have a health check report storage as
+unreachable from Vercel — that is the true state, not a bug.
+
+## Deploy
+
+Link the Vercel project with its root directory set to the app's
+package inside the workspace, and connect it to the GitHub repo so
+pushes to the default branch deploy. In a monorepo, set an ignored build
+step (for example `git diff --quiet HEAD^ HEAD -- <project-dir>`) so a
+push that does not touch the project skips its deploy.

@@ -287,17 +287,17 @@ them to the opinionated template.
 
 **Acceptance criteria:**
 
-- [ ] `docs/STACK.md` lists every command in the spec's Commands section,
+- [x] `docs/STACK.md` lists every command in the spec's Commands section,
       each one verified in this module.
-- [ ] `../../templates/opinionated/docs/STACK.md` gets the same commands,
+- [x] `../../templates/opinionated/docs/STACK.md` gets the same commands,
       with no project names or project paths.
-- [ ] If the template's scripts or hooks change, `../../tests/run.sh`
+- [x] If the template's scripts or hooks change, `../../tests/run.sh`
       changes in the same commit.
 
 **Verification:**
 
-- [ ] `bash ../../tests/run.sh` exits 0
-- [ ] `prettier --check "**/*.md"` exits 0
+- [x] `bash ../../tests/run.sh` exits 0
+- [x] `prettier --check "**/*.md"` exits 0
 
 **Dependencies:** T8, T10, T11
 
