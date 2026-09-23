@@ -57,16 +57,16 @@ placeholder. Chrome and Firefox builds come from one codebase.
 
 **Acceptance criteria:**
 
-- [ ] `bunx wxt@0.21.4 init apps/extension -t react --pm bun` ran, and
+- [x] `bunx wxt@0.21.4 init apps/extension -t react --pm bun` ran, and
       the demo content is removed.
-- [ ] The popup renders the text `rewind`, and a Vitest test covers it at
+- [x] The popup renders the text `rewind`, and a Vitest test covers it at
       100%.
-- [ ] `package.json` has `dev`, `dev:firefox`, `build` (Chrome and
+- [x] `package.json` has `dev`, `dev:firefox`, `build` (Chrome and
       Firefox), `test` and `typecheck`.
 
 **Verification:**
 
-- [ ] `bun run --filter extension build` writes `.output/chrome-mv3` and `.output/firefox-mv2` (or `-mv3`)
+- [x] `bun run --filter extension build` writes `.output/chrome-mv3` and `.output/firefox-mv2` (or `-mv3`)
 
 **Dependencies:** T1
 
@@ -76,8 +76,8 @@ placeholder. Chrome and Firefox builds come from one codebase.
 
 ## Checkpoint A: after T1 to T3
 
-- [ ] `bun run lint`, `bun run typecheck`, `bun run test` and `bun run build` all exit 0
-- [ ] Commit `feat(rewind): scaffold bun workspace with web and extension` and push
+- [x] `bun run lint`, `bun run typecheck`, `bun run test` and `bun run build` all exit 0
+- [x] Commit `feat(rewind): scaffold bun workspace with web and extension` and push
 
 ## T4: `env.ts` with zod
 
