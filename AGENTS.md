@@ -21,8 +21,8 @@ cloned from them. `CLAUDE.md` is a symlink to this file.
 ## Commands
 
 - Test: `bash tests/run.sh`
-- Lint: `shellcheck scripts/*.sh tests/*.sh templates/agnostic/.claude/hooks/*.sh`
-- Format: `shfmt -w scripts tests templates/agnostic/.claude/hooks` and `prettier --write "**/*.md"`
+- Lint: `shellcheck scripts/*.sh tests/*.sh templates/*/.claude/hooks/*.sh`
+- Format: `shfmt -w scripts tests templates/*/.claude/hooks` and `prettier --write "**/*.md"`
 - New project: `scripts/new-project.sh [-t agnostic|opinionated] <name> [dest]`
 
 ## Rules

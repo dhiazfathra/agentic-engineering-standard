@@ -42,6 +42,27 @@ check "keeps agnostic base files" test -x "$op/.claude/hooks/learn-nudge.sh"
 check "appends .append files" bash -c "grep -q '^.serena/' '$op/.gitignore' && grep -q '^/.next/' '$op/.gitignore'"
 check "removes .append files" test -z "$(find "$op" -name '*.append')"
 check "records opinionated origin" grep -q 'from the .opinionated. template' "$op/learning/MEMORY.md"
+check "overlay adds bun-only hook" test -x "$op/.claude/hooks/bun-only.sh"
+# shellcheck disable=SC2016 # jq variables, not shell
+check "overlay settings keep base hooks" jq -e --slurpfile b "$repo/templates/agnostic/.claude/settings.json" \
+	'.hooks.SessionStart == $b[0].hooks.SessionStart and .hooks.Stop == $b[0].hooks.Stop' "$op/.claude/settings.json" >/dev/null
+check "overlay settings wire bun-only" jq -e '.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command | endswith("bun-only.sh")' "$op/.claude/settings.json" >/dev/null
+check "ignores foreign lockfiles" grep -qx 'pnpm-lock.yaml' "$op/.gitignore"
+
+# --- bun-only.sh ---
+bun_hook=$repo/templates/opinionated/.claude/hooks/bun-only.sh
+# shellcheck disable=SC2329 # both are called through check
+bun_run() { jq -n --arg c "$1" '{tool_input: {command: $c}}' | "$bun_hook" 2>/dev/null; }
+# shellcheck disable=SC2329
+bun_blocks() { ! bun_run "$1"; }
+# shellcheck disable=SC2016 # literal $(...) is the input under test
+for c in 'npm install' 'npx next dev' 'pnpm i' 'yarn' 'cd app && npm run build' 'sudo npm i -g x' 'echo $(npm -v)'; do
+	check "bun-only blocks: $c" bun_blocks "$c"
+done
+for c in 'bun install' 'bunx next dev' 'grep -r npm .' 'ls ~/npm-cache' 'bun add yarn-lock-parser'; do
+	check "bun-only allows: $c" bun_run "$c"
+done
+check "bun-only allows non-Bash input" bash -c "echo '{}' | '$bun_hook'"
 
 # --- learn-nudge.sh ---
 proj=$tmp/proj

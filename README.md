@@ -13,10 +13,12 @@ templates/agnostic/        stack-agnostic base
   learning/LESSONS.md      mistakes, with evidence and a fix
   .claude/skills/learn     the learning-loop skill
   .claude/hooks/           Stop hook that asks the agent to run the learn skill
-templates/opinionated/     overlay on agnostic: Next.js on Vercel, Turso, MinIO
+templates/opinionated/     overlay on agnostic: Next.js on Vercel, Turso, MinIO, bun
   docs/STACK.md            the chosen stack
+  .claude/hooks/bun-only.sh  PreToolUse hook that blocks npm, npx, pnpm, and yarn
+  .claude/settings.json    base hooks plus bun-only
   docs/diagrams/           stack comparison behind the choice
-  .gitignore.append        Next.js ignores, appended to the base .gitignore
+  .gitignore.append        Next.js ignores and foreign lockfiles, appended to the base .gitignore
 examples/rewind/           working example and case study, built from opinionated
 docs/adr/                  architecture decision records for this repo
 learning/                  this repo's own memory and lessons
@@ -79,5 +81,5 @@ agnostic template's hook, settings, and learn skill, and it keeps its own
 
 ```sh
 bash tests/run.sh
-shellcheck scripts/*.sh tests/*.sh templates/agnostic/.claude/hooks/*.sh
+shellcheck scripts/*.sh tests/*.sh templates/*/.claude/hooks/*.sh
 ```
