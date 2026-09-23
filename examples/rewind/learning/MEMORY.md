@@ -14,3 +14,5 @@ Update a line when it changes and delete it when it is wrong.
 - 2026-09-23 v1 deploys to Vercel but keeps MinIO on this PC. Presigned URLs work from Vercel; server-to-MinIO calls do not. MinIO moves to a VPS next iteration.
 - 2026-09-23 Bun 1.4.2 is the package manager and script runner, not pnpm (user decision). Node 24 stays the runtime; Vitest stays the test runner.
 - 2026-09-23 Vercel: CLI logged in as `envisionlab-ai`; project `rewind` goes under team `envision-labs-projects-71c0945a`, root `examples/rewind/apps/web`.
+- 2026-09-23 Deviations from SPEC-infra, each recorded in its commit: ESLint 9.39.5 not 10; fonts via `next/font/google` instead of copied `.ttf` files; `parseEnv` lives in `parse-env.ts` so `drizzle.config.ts` can reuse it.
+- 2026-09-23 MinIO CORS origins come from `S3_CORS_ORIGINS` (default `http://localhost:3000`). Add the Vercel domain when it exists.
