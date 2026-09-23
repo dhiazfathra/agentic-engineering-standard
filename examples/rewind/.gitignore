@@ -11,3 +11,15 @@
 !.claude/settings.json
 !.claude/hooks/
 !.claude/skills/
+
+# Next.js / Vercel
+/node_modules
+/.next/
+/out/
+/build
+/coverage
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+local.db
+local.db-*

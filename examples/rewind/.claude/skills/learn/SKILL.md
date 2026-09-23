@@ -26,7 +26,7 @@ already records.
 ## 3. Lessons
 
 Write one line to `learning/LESSONS.md` for each thing that went wrong:
-`- YYYY-MM-DD [project|general] Lesson. Evidence: ... Do instead: ...`
+`- YYYY-MM-DD [project|stack|general] Lesson. Evidence: ... Do instead: ...`
 A lesson without evidence is an opinion. Leave it out.
 
 ## 4. Skills
@@ -41,11 +41,18 @@ A lesson without evidence is an opinion. Leave it out.
 
 ## 5. Promote
 
-If the path `../../template` exists, you are inside the monorepo. Apply
-each `[general]` lesson or skill to the matching file under
-`../../template/`. Then add `(promoted)` to the end of the lesson line.
-Keep the template stack-agnostic, so leave out project names, stacks, and
-paths. If `../../template` does not exist, do not promote anything.
+If the path `../../templates` exists, you are inside the monorepo. Promote
+lessons and skills by their tag:
+
+- `[general]` applies to any stack. Apply it to `../../templates/agnostic/`.
+- `[stack]` applies to this project's stack. `learning/MEMORY.md` records
+  which template the project was created from. If it was the opinionated
+  template, apply the lesson to `../../templates/opinionated/`. Otherwise
+  treat the lesson as `[project]`.
+
+After you apply a lesson, add `(promoted)` to the end of its line. Leave
+project names and project paths out of the templates. If
+`../../templates` does not exist, do not promote anything.
 
 ## 6. Report
 

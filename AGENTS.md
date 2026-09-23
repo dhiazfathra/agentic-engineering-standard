@@ -1,30 +1,37 @@
 # agentic-engineering-standard
 
-This monorepo holds an agentic engineering template and projects cloned
-from it. `CLAUDE.md` is a symlink to this file.
+This monorepo holds two agentic engineering templates and the projects
+cloned from them. `CLAUDE.md` is a symlink to this file.
 
 ## Layout
 
-- `template/` is the stack-agnostic boilerplate. It holds the rules, the
+- `templates/agnostic/` is the stack-agnostic base. It holds the rules, the
   learning files, the learn skill, and the Stop hook.
-- `examples/<name>/` is a real project cloned from the template. Open the
+- `templates/opinionated/` is an overlay on top of the base. It fixes the
+  stack (Next.js on Vercel, Turso, self-hosted MinIO). It holds only the
+  files that differ from the base. A file named `<file>.append` is appended
+  to the base file instead of replacing it.
+- `examples/<name>/` is a real project cloned from a template.
+  `examples/rewind` is built from the opinionated template. Open the
   project directory itself as the agent workspace, so its hook and skills
   load.
-- `scripts/new-project.sh` clones the template.
-- `tests/run.sh` tests the scripts and the hook.
+- `scripts/new-project.sh` clones a template.
+- `tests/run.sh` tests the script and the hook.
 
 ## Commands
 
 - Test: `bash tests/run.sh`
-- Lint: `shellcheck scripts/*.sh tests/*.sh template/.claude/hooks/*.sh`
-- Format: `shfmt -w scripts tests template/.claude/hooks` and `prettier --write "**/*.md"`
-- New project: `scripts/new-project.sh <name> [dest]`
+- Lint: `shellcheck scripts/*.sh tests/*.sh templates/agnostic/.claude/hooks/*.sh`
+- Format: `shfmt -w scripts tests templates/agnostic/.claude/hooks` and `prettier --write "**/*.md"`
+- New project: `scripts/new-project.sh [-t agnostic|opinionated] <name> [dest]`
 
 ## Rules
 
-- Change the template only for general lessons that apply to any stack.
-  Project specifics stay in the project.
+- A lesson that applies to any stack goes in `templates/agnostic`. A
+  stack-specific lesson goes in `templates/opinionated`. Project
+  specifics stay in the project.
+- Never copy a base file into the overlay unless the content differs.
 - A template change does not reach projects that already exist. Port it to
   each example by hand when it matters.
-- When you change the template's hook or the clone script, update
-  `tests/run.sh` in the same change.
+- When you change the hook or the clone script, update `tests/run.sh` in
+  the same change.

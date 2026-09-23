@@ -1,23 +1,14 @@
 # rewind
 
-A Rewind for bug reports with screen recordings. It is the working
-example and case study for the template at `../../template`.
+Rewind is a bug-reporting tool built around screen recordings. It is the
+working example and case study for `../../templates/opinionated`.
 
-`CLAUDE.md` is a symlink to this file. Edit this file only.
+`CLAUDE.md` imports this file. Edit this file only.
 
-## Stack
+## Stack and commands
 
-- Next.js fullstack, deployed on Vercel
-- Turso (libSQL) for the database
-- Self-hosted MinIO for recording blobs only
-
-The rationale is in `docs/diagrams/stack-comparison.html`. The app is not
-scaffolded yet.
-
-## Commands
-
-TBD. List the exact test, lint, build, and dev commands once they exist.
-A command not listed here does not exist yet. Do not guess one.
+`docs/STACK.md` lists the stack and the exact test, lint, build, and dev
+commands. A command it does not list does not exist yet. Do not guess one.
 
 ## Boundaries
 
