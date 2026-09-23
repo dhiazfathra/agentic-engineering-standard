@@ -25,6 +25,21 @@ later module builds on.
   removes the DB row first (the source of truth), then tries the S3
   delete in a `try/catch` that only logs — matches ADR-0011, and means a
   Vercel-side delete never blocks or fails the request.
+- **The server owns the media key.** `POST /api/uploads` takes only a
+  content type from an allowlist (`video/webm`, `video/mp4`,
+  `image/png`, `image/jpeg`) and returns `rewinds/<nanoid>.<ext>`. One
+  regex for that shape lives in `packages/schema`, and `createRewind`
+  rejects any other `mediaKey` (spec Boundaries: never trust a client
+  key outside this prefix). The content type is signed into the URL, so
+  the client must `PUT` with the same `Content-Type`.
+- **Foreign keys are on and tested.** SQLite enforces `onDelete` only
+  with `PRAGMA foreign_keys = ON`. A test deletes a Rewind and asserts
+  its events and comments are gone, and deletes a folder and asserts
+  its Rewinds keep existing with `folderId = null`.
+- **The seed script does not import `@/lib/db`.** `db.ts` imports
+  `server-only`, which throws outside Next. `seed.ts` builds its own
+  client from `parseEnv` after `loadEnvConfig`, as `drizzle.config.ts`
+  does.
 - **Seed script is idempotent.** `db:seed` deletes existing seed rows (by
   a fixed set of ids) before inserting, so running it twice is safe, the
   same property `infra`'s `mc mb --ignore-existing` and `db:migrate` have.
@@ -55,7 +70,7 @@ T10 + T11 ── T12 STACK.md update if commands changed
 ### Checkpoint A
 
 - [ ] `bun run db:migrate` exits 0 against `file:local.db`
-- [ ] Commit and push
+- [ ] Commit (the no-mistakes pipeline owns the push for this branch)
 
 ### Phase 2: Routes
 
@@ -69,12 +84,14 @@ T10 + T11 ── T12 STACK.md update if commands changed
 ### Checkpoint B
 
 - [ ] `bun run test` at 100% coverage; `lint` and `typecheck` clean
-- [ ] Commit and push
+- [ ] Commit
 
 ### Phase 3: Seed and proof
 
 - [ ] T9: `db:seed`
-- [ ] T10: integration test — create → list → get → patch → delete
+- [ ] T10: integration test — create → list → get → patch → delete, and
+      folder/link CRUD, against a migrated temporary `file:` database
+      (same engine as `file:local.db`, without clobbering the dev DB)
 - [ ] T11: upload → finalize → fetch e2e against real MinIO
 - [ ] T12: update `docs/STACK.md` if `db:seed` or other commands are new
 
@@ -87,12 +104,25 @@ T10 + T11 ── T12 STACK.md update if commands changed
 
 ## Risks and mitigations
 
-| Risk                                                                             | Impact | Mitigation                                                                                                          |
-| --------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
-| Cascading deletes need `onDelete: "cascade"` on both FKs in SQLite/libSQL          | Med    | Set it explicitly in Drizzle's `references()`; cover with a test that deletes a Rewind and asserts its events/comments are gone. |
-| A presigned PUT URL's SHA-signed headers mismatch what the test client sends      | Med    | Use the SDK's own `fetch` in the e2e test, not a hand-built request, so headers match what a real browser would send via the SDK-generated URL. |
-| Nanoid collision or empty string breaks a route's zod `min(1)` check              | Low    | Nanoid's default alphabet and length (21 chars) make collision practical only after billions of ids; not a v1 concern. |
-| Seed script leaves orphaned S3 objects if MinIO isn't running                      | Low    | Seed only writes DB rows referencing fixture keys; it does not upload anything, so no S3 dependency.               |
+| Risk                                                                         | Impact | Mitigation                                                                                                                       |
+| ---------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Cascading deletes need `onDelete: "cascade"` on both FKs in SQLite/libSQL    | Med    | Set it explicitly in Drizzle's `references()`; cover with a test that deletes a Rewind and asserts its events/comments are gone. |
+| A presigned PUT URL's SHA-signed headers mismatch what the test client sends | Med    | The e2e `PUT`s with plain `fetch` and the same `Content-Type` the URL was signed for, exactly what the extension will do.        |
+| Nanoid collision or empty string breaks a route's zod `min(1)` check         | Low    | Nanoid's default alphabet and length (21 chars) make collision practical only after billions of ids; not a v1 concern.           |
+| Seed script leaves orphaned S3 objects if MinIO isn't running                | Low    | Seed only writes DB rows referencing fixture keys; it does not upload anything, so no S3 dependency.                             |
+
+## Corrections to the first draft
+
+Checked against the approved spec on 2026-09-23:
+
+- Added the server-owned media key and its prefix check (spec
+  Boundaries); the draft did not cover it.
+- Added the folder `onDelete: set null` and the foreign-key pragma risk.
+- The e2e risk row suggested an SDK `fetch`; there is none. It now uses
+  plain `fetch`, as a client would.
+- Checkpoints commit only. This branch ships through no-mistakes, which
+  pushes.
+- The seed script cannot import `@/lib/db` (`server-only`).
 
 ## Open questions
 
