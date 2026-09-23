@@ -40,9 +40,10 @@ later module builds on.
   `server-only`, which throws outside Next. `seed.ts` builds its own
   client from `parseEnv` after `loadEnvConfig`, as `drizzle.config.ts`
   does.
-- **Seed script is idempotent.** `db:seed` deletes existing seed rows (by
-  a fixed set of ids) before inserting, so running it twice is safe, the
-  same property `infra`'s `mc mb --ignore-existing` and `db:migrate` have.
+- **Seed script is idempotent.** `db:seed` inserts only the seed rows
+  missing by their fixed ids (see `seed()` in `apps/web/src/db/seed.ts`),
+  so running it twice is safe, the same property `infra`'s
+  `mc mb --ignore-existing` and `db:migrate` have.
 
 ## Dependency graph
 
