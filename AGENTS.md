@@ -27,6 +27,10 @@ cloned from them. `CLAUDE.md` is a symlink to this file.
 
 ## Rules
 
+- When a tool is already authenticated (Vercel, Turso, gh, docker, etc.),
+  proceed with the action instead of asking permission first. Ask only
+  when the action is destructive, changes billing, or the tool is not
+  yet authenticated.
 - A lesson that applies to any stack goes in `templates/agnostic`. A
   stack-specific lesson goes in `templates/opinionated`. Project
   specifics stay in the project.

@@ -261,18 +261,18 @@ confirm that the Firefox build exists.
 
 **Acceptance criteria:**
 
-- [ ] `vercel project add rewind --scope envision-labs-projects-71c0945a`
+- [x] `vercel project add rewind --scope envision-labs-projects-71c0945a`
       creates the project, with root directory `examples/rewind/apps/web`,
       connected to the GitHub repo.
-- [ ] Production env vars are set. `DATABASE_AUTH_TOKEN` is piped from
+- [x] Production env vars are set. `DATABASE_AUTH_TOKEN` is piped from
       `turso db tokens create rewind` and never printed.
-- [ ] `bun run db:migrate` has run against Turso cloud.
-- [ ] An ignored build step skips deploys that don't touch
+- [x] `bun run db:migrate` has run against Turso cloud.
+- [x] An ignored build step skips deploys that don't touch
       `examples/rewind`.
 
 **Verification:**
 
-- [ ] `curl https://<deploy>/api/health` returns `"database":"ok"` and `"storage":"unreachable"`, with status 503
+- [x] `curl https://<deploy>/api/health` returns `"database":"ok"` and `"storage":"unreachable"`, with status 503
 
 **Dependencies:** T7, T9
 

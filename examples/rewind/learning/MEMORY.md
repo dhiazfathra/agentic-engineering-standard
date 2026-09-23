@@ -16,3 +16,5 @@ Update a line when it changes and delete it when it is wrong.
 - 2026-09-23 Vercel: CLI logged in as `envisionlab-ai`; project `rewind` goes under team `envision-labs-projects-71c0945a`, root `examples/rewind/apps/web`.
 - 2026-09-23 Deviations from SPEC-infra, each recorded in its commit: ESLint 9.39.5 not 10; fonts via `next/font/google` instead of copied `.ttf` files; `parseEnv` lives in `parse-env.ts` so `drizzle.config.ts` can reuse it.
 - 2026-09-23 MinIO CORS origins come from `S3_CORS_ORIGINS` (default `http://localhost:3000`). Add the Vercel domain when it exists.
+- 2026-09-23 Vercel project `rewind` created and linked (team envision-labs-projects-71c0945a, root examples/rewind/apps/web). Production alias: https://rewind-ecru.vercel.app. GitHub connected; pushes to main deploy. Ignored build step: `git diff --quiet HEAD^ HEAD -- .`.
+- 2026-09-23 Turso cloud database migrated (0000_init baseline). Vercel env vars set for production/preview/development: DATABASE_URL, DATABASE_AUTH_TOKEN (production only), S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY.
