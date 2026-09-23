@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Stack review — Rewind</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+    <style>
+      :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+      *, *::before, *::after { box-sizing: inherit; }
+      html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+      body { background: #fafaf9; }
+      .seam { stroke-dasharray: 4 4; }
+      .leak { stroke: #dc2626; }
+      .wall { background: linear-gradient(135deg, #0f172a, #1e293b); }
+      pre.mermaid { display: flex; justify-content: center; }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-900 font-sans">
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-12">
+      <header class="space-y-3">
+        <h1 class="text-2xl font-serif">Stack review — Rewind</h1>
+        <p class="text-sm text-slate-500">Four candidates. Cost-driven, agent-built, simple as possible.</p>
+        <div class="flex flex-wrap gap-4 text-xs uppercase tracking-wider text-slate-500 pt-2">
+          <span><span class="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-1"></span>Strong</span>
+          <span><span class="inline-block w-3 h-3 rounded-full bg-amber-500 mr-1"></span>Worth exploring</span>
+          <span><span class="inline-block w-3 h-3 rounded-full bg-slate-400 mr-1"></span>Speculative</span>
+          <span class="text-red-600">— · red = the wall (storage/ops ceiling)</span>
+        </div>
+      </header>
+
+      <section id="candidates" class="space-y-10">
+
+        <!-- Go -->
+        <article class="rounded-lg border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-lg font-medium">Go-kratos backend, own infra</h2>
+            <div class="flex gap-2">
+              <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wider">Speculative</span>
+              <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wider">full ownership</span>
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  Ext[Extension] --> API[Go API]
+  API --> PG[(Postgres)]
+  API --> S3[Object storage]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class S3 leak
+            </pre>
+          </div>
+          <p class="text-sm"><span class="font-medium">Problem:</span> matches your Tokopedia/Dermalicious depth, but every layer — infra, deploys, auth, storage — is a seam an agent has to get right alone.</p>
+          <p class="text-sm"><span class="font-medium">Solution:</span> reserve this pattern for when the project needs to justify itself as a scale artifact, not for a fast solo build.</p>
+          <ul class="text-sm list-disc list-inside text-slate-700">
+            <li>locality: none — every concern is its own service to provision</li>
+            <li>leverage: high once built, low while building</li>
+            <li>widest interface of all four candidates — most agent drift risk</li>
+          </ul>
+        </article>
+
+        <!-- Supabase -->
+        <article class="rounded-lg border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-lg font-medium">Supabase (DB + auth + storage, one vendor)</h2>
+            <div class="flex gap-2">
+              <span class="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wider">Worth exploring</span>
+              <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wider">managed</span>
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  Ext[Extension] --> Web[Next.js viewer]
+  Ext --> SB[Supabase Storage]
+  Web --> PG[(Supabase Postgres)]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class SB leak
+            </pre>
+          </div>
+          <p class="text-sm"><span class="font-medium">Problem:</span> deepest single-vendor interface of the four — one seam, not three. But the wall sits at 1 GB storage, and the project itself goes shallow after 7 idle days: it pauses.</p>
+          <p class="text-sm"><span class="font-medium">Solution:</span> fine as a throwaway prototype; the inactivity pause makes it a poor fit for something meant to stay demoable.</p>
+          <ul class="text-sm list-disc list-inside text-slate-700">
+            <li>locality: high — one vendor, one client library</li>
+            <li>leak: storage wall reached first, same as every candidate here</li>
+            <li>unique cost: idle project goes dark, not just slow</li>
+          </ul>
+        </article>
+
+        <!-- Vercel fullstack -->
+        <article class="rounded-lg border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-lg font-medium">Next.js fullstack + Turso + Vercel Blob</h2>
+            <div class="flex gap-2">
+              <span class="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 uppercase tracking-wider">Worth exploring</span>
+              <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wider">no idle-pause</span>
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  Ext[Extension] --> Api[Next.js API route]
+  Ext -. direct upload .-> Blob[Vercel Blob]
+  Api --> Turso[(Turso libSQL)]
+  classDef leak stroke:#dc2626,stroke-width:2px;
+  class Blob leak
+            </pre>
+          </div>
+          <p class="text-sm"><span class="font-medium">Problem:</span> one framework, one deploy — the deepest module of the four for build simplicity. But the wall is the same 1 GB, this time with a hard lock instead of a pause: exceed it and Blob is unreachable for 30 days.</p>
+          <p class="text-sm"><span class="font-medium">Solution:</span> good default until real usage; the seam that leaks first is storage, not architecture — you already hit it here.</p>
+          <ul class="text-sm list-disc list-inside text-slate-700">
+            <li>locality: highest — single repo, single deploy target</li>
+            <li>leverage: presigned direct-upload pattern reused for any blob provider later</li>
+            <li>leak: 30-day lockout on overage, no graceful degrade</li>
+          </ul>
+        </article>
+
+        <!-- Vercel + MinIO -->
+        <article class="rounded-lg border border-slate-200 bg-white p-6 space-y-4">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="text-lg font-medium">Next.js + Turso (Vercel) + MinIO (self-hosted blob only)</h2>
+            <div class="flex gap-2">
+              <span class="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wider">Strong</span>
+              <span class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wider">one seam moved, not multiplied</span>
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <pre class="mermaid">
+flowchart LR
+  Ext[Extension] --> Api[Next.js API route]
+  Ext -. presigned PUT .-> Minio[MinIO on VPS]
+  Api --> Turso[(Turso libSQL)]
+  Api -. presign .-> Minio
+            </pre>
+          </div>
+          <p class="text-sm"><span class="font-medium">Problem:</span> the only candidate where the wall moves — storage becomes disk you own instead of a vendor cap. Everything else stays exactly as deep as the pure-Vercel version.</p>
+          <p class="text-sm"><span class="font-medium">Solution:</span> swap only the blob adapter; DB, API routes, frontend untouched. One new module (MinIO + TLS + CORS), not a rearchitecture.</p>
+          <ul class="text-sm list-disc list-inside text-slate-700">
+            <li>locality: storage concern now fully isolated behind one presign interface</li>
+            <li>leverage: same client-direct-upload shape as Vercel Blob — low switching cost</li>
+            <li>new cost: you now own uptime, TLS, and backups for one VPS</li>
+          </ul>
+          <div class="text-xs bg-amber-50 border border-amber-200 rounded px-3 py-2">ADR-worthy: presigned-URL contract is the seam — document it once, both blob adapters implement it.</div>
+        </article>
+
+      </section>
+
+      <section id="top-recommendation" class="rounded-lg wall text-white p-6">
+        <h2 class="text-lg font-medium mb-1">Top pick: Vercel + Turso + self-hosted MinIO</h2>
+        <p class="text-sm text-slate-200">It's the only option where the wall you already hit moves out of the way without adding a second architectural seam. Everything else in the stack stays as deep and as agent-buildable as the pure-Vercel version.</p>
+      </section>
+
+    </main>
+  
+<!--claude-mermaid-runtime-begin:3477-->
+<style>.mermaid-diagram{margin-block:4px}.mermaid-diagram svg{display:block;margin:0 auto;max-width:100%;height:auto}</style>
+<script src="/_runtime/mermaid-11.16.1.min.js"></script>
+<script>(function(){
+var CFG={"palettes":{"light":{"surface":"#f4efe4","text":"#42392e","line":"#8a7f6d","border":"#7a6c52","bg":"#fffdf8"},"dark":{"surface":"#262b34","text":"#f2f3f5","line":"#a8adb8","border":"#9aa4b8","bg":"#1f232b"}}};
+if(typeof mermaid==='undefined')return;
+var pres=Array.prototype.slice.call(document.querySelectorAll('pre.mermaid')).filter(function(p){if(p.hasAttribute('data-claude-mermaid-claimed'))return false;p.setAttribute('data-claude-mermaid-claimed','1');return true;});
+if(!pres.length)return;
+var mq=window.matchMedia?window.matchMedia('(prefers-color-scheme: dark)'):null;
+var root=document.documentElement;
+var items=pres.map(function(pre){
+var mount=document.createElement('div');mount.className='mermaid-diagram';
+return {pre:pre,mount:mount,src:pre.textContent||''};
+});
+var seq=0;
+var renderGen=0;
+var lastKey='';
+function pageBg(fallback){
+var els=[document.body,document.documentElement];
+for(var i=0;i<els.length;i++){
+var c=els[i]&&getComputedStyle(els[i]).backgroundColor;
+if(c&&c!=='transparent'&&c!=='rgba(0, 0, 0, 0)')return c;
+}
+return fallback;
+}
+function render(){
+var theme=root.getAttribute('data-theme');
+var dark=theme==='dark'||(!!(mq&&mq.matches)&&theme!=='light');
+var pal=dark?CFG.palettes.dark:CFG.palettes.light;
+var bg=pageBg(pal.bg);
+var key=(dark?'d':'l')+'|'+bg;
+if(key===lastKey)return;
+lastKey=key;
+var gen=++renderGen;
+var font=getComputedStyle(document.body).fontFamily||'sans-serif';
+var nat={useMaxWidth:false};
+mermaid.initialize({
+startOnLoad:false,securityLevel:'strict',theme:'base',
+flowchart:nat,sequence:nat,er:nat,state:nat,class:nat,pie:nat,
+gantt:nat,journey:nat,timeline:nat,gitGraph:nat,mindmap:nat,xyChart:nat,
+quadrantChart:nat,sankey:nat,c4:nat,requirement:nat,block:nat,
+packet:nat,kanban:nat,architecture:nat,radar:nat,
+themeVariables:{background:bg,mainBkg:pal.surface,primaryColor:pal.surface,
+primaryTextColor:pal.text,lineColor:pal.line,primaryBorderColor:pal.border,
+nodeBorder:pal.border,clusterBorder:pal.border,edgeLabelBackground:bg,
+clusterBkg:'rgba(127,127,127,0.07)',titleColor:pal.text,
+darkMode:dark,rowOdd:bg,rowEven:'rgba(127,127,127,0.07)',
+attributeBackgroundColorOdd:bg,attributeBackgroundColorEven:'rgba(127,127,127,0.07)',
+fontSize:'16px',fontFamily:font},
+themeCSS:'.node rect, .node circle, .node polygon, .node path, .cluster rect { stroke-width: 2px; }'
+});
+items.forEach(function(it){
+var id='claude-mermaid-'+seq++;
+mermaid.render(id,it.src).then(function(r){
+if(gen!==renderGen)return;
+var prev=it.pre.previousElementSibling;
+if(prev&&prev.className==='mermaid-diagram'&&prev!==it.mount)return;
+it.mount.innerHTML=r.svg;
+if(!it.mount.parentNode)it.pre.parentNode.insertBefore(it.mount,it.pre);
+it.pre.style.display='none';
+},function(){
+var scratch=document.getElementById(id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+scratch=document.getElementById('d'+id);
+if(scratch)scratch.parentNode.removeChild(scratch);
+if(gen!==renderGen)return;
+if(it.mount.parentNode)it.mount.parentNode.removeChild(it.mount);
+it.pre.style.display='';
+});
+});
+}
+render();
+if(mq&&mq.addEventListener)mq.addEventListener('change',render);
+if(typeof MutationObserver!=='undefined')new MutationObserver(render).observe(root,{attributes:true,attributeFilter:['data-theme']});
+})();</script>
+<!--claude-mermaid-runtime-end-->
+</body>
+</html>
