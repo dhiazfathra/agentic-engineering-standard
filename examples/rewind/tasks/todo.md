@@ -160,15 +160,15 @@ answer.
 
 **Acceptance criteria:**
 
-- [ ] The route matches the spec's snippet: 200 when both are `ok`, 503
+- [x] The route matches the spec's snippet: 200 when both are `ok`, 503
       otherwise, and the body names each probe.
-- [ ] Unit tests cover all four ok and unreachable combinations, with the
+- [x] Unit tests cover all four ok and unreachable combinations, with the
       db and s3 clients stubbed.
 
 **Verification:**
 
-- [ ] `bun run --filter web test` passes at 100%
-- [ ] `curl -i localhost:3000/api/health` gives 200, and gives 503 with `"storage":"unreachable"` after `docker compose stop minio`
+- [x] `bun run --filter web test` passes at 100%
+- [x] `curl -i localhost:3000/api/health` gives 200, and gives 503 with `"storage":"unreachable"` after `docker compose stop minio`
 
 **Dependencies:** T5, T6
 
@@ -178,9 +178,9 @@ answer.
 
 ## Checkpoint B: after T4 to T7
 
-- [ ] `bun run test` passes at 100%. `lint` and `typecheck` are clean
-- [ ] Spec success criteria 2, 3 (local) and 4 hold
-- [ ] Commit `feat(rewind): add env, turso, minio and health check` and push
+- [x] `bun run test` passes at 100%. `lint` and `typecheck` are clean
+- [x] Spec success criteria 2, 3 (local) and 4 hold
+- [x] Commit `feat(rewind): add env, turso, minio and health check` and push
 
 ## T8: Health e2e against real services
 
