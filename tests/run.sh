@@ -57,5 +57,24 @@ check "silent once learning/ changed" test -z "$(run_hook '{}')"
 check "silent outside git" test -z "$(echo '{}' | CLAUDE_PROJECT_DIR=$tmp/out "$hook")"
 check "hook output is valid JSON" bash -c "rm -rf '$proj/learning'; echo '{}' | CLAUDE_PROJECT_DIR='$proj' '$hook' | jq -e .decision >/dev/null"
 
+# Session snapshot: files dirty at SessionStart do not count.
+sid='{"session_id": "s1"}'
+start_hook() { echo "$sid" | CLAUDE_PROJECT_DIR=$proj "$hook" start; }
+check "start is silent" test -z "$(start_hook)"
+check "silent on files dirty before session" test -z "$(run_hook "$sid")"
+check "other session still sees them" test -n "$(run_hook '{"session_id": "s2"}')"
+echo edit >>"$proj/app.ts"
+check "blocks when pre-dirty file changes" test -n "$(run_hook "$sid")"
+start_hook
+touch "$proj/new.ts"
+check "blocks on new file" test -n "$(run_hook "$sid")"
+git -C "$proj" add -A && git -C "$proj" -c user.name=t -c user.email=t@t commit -qm c1
+start_hook
+touch "$proj/later.ts"
+git -C "$proj" add -A && git -C "$proj" -c user.name=t -c user.email=t@t commit -qm c2
+check "blocks on work committed in session" test -n "$(run_hook "$sid")"
+mkdir -p "$proj/learning" && touch "$proj/learning/MEMORY.md"
+check "silent once session touched learning/" test -z "$(run_hook "$sid")"
+
 echo "$fails failure(s)"
 exit "$fails"
