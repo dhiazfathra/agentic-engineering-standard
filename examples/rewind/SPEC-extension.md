@@ -96,8 +96,9 @@ Event text follows the seed data: `Navigated to host/path`,
 `Clicked “Label”` (`… field` for form fields), `Typed in “Label” field`,
 `GET /api/cart · 200 · 92ms` (`1.2s` from 1000ms, `failed` for a network
 error; same-origin URLs as a path). Input values are never captured.
-Console arguments are joined with spaces; objects are `JSON.stringify`d
-and fall back to `String()`. Text is cut at 10,000 characters.
+Console arguments are joined with spaces; an `Error` becomes its stack
+(or `name: message`), other objects are `JSON.stringify`d and fall back
+to `String()`. Text is cut at 10,000 characters.
 
 **Buffer.** The background keeps each tab's events with their absolute
 time, for the last 2 minutes, or since that tab's recording started. It
@@ -141,7 +142,8 @@ labels drawn in as `image/png`.
 JPEG `captureVisibleTab` of the focused window's active `http(s)` tab
 every second and stores it in IndexedDB with the tab id, deleting
 snapshots older than 2 minutes. An alarm every 30 seconds restarts the
-loop after the worker sleeps. Turning it off deletes every snapshot.
+loop after the worker sleeps. Turning it off deletes every snapshot
+and clears the alarm.
 **Save instant replay** makes a draft from that tab's snapshots and
 events. The editor encodes the snapshots into a `video/webm` at their
 real times with Mediabunny (WebCodecs), then treats it as a recording.
