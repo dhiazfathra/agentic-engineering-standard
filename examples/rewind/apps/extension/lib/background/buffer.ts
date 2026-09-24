@@ -13,16 +13,29 @@ const store = storage.defineItem<TabBuffers>("session:buffer", {
   fallback: {},
 });
 
+type Holds = Record<number, number>;
+
+const holdsStore = storage.defineItem<Holds>("session:holds", {
+  fallback: {},
+});
+
 // A restarted service worker re-populates this from `storage.session` on its
 // first call; afterwards every read and write stays in memory, and saves are
 // debounced so a burst of events costs one write.
 let buffers: TabBuffers | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
-const holdSince = new Map<number, number>();
+// Holds are rare (recording start/stop) and must survive a worker restart
+// immediately, so they're written through on every change instead of debounced.
+let holds: Holds | undefined;
 
 async function load(): Promise<TabBuffers> {
   buffers ??= await store.getValue();
   return buffers;
+}
+
+async function loadHolds(): Promise<Holds> {
+  holds ??= await holdsStore.getValue();
+  return holds;
 }
 
 function scheduleSave(): void {
@@ -41,10 +54,11 @@ export async function add(
 ): Promise<void> {
   const all = await load();
   const events = all[tabId] ?? [];
+  const tabHolds = await loadHolds();
   all[tabId] = trim(
     [...events, capturedEvent],
     Date.now(),
-    holdSince.get(tabId) ?? null,
+    tabHolds[tabId] ?? null,
   );
   scheduleSave();
 }
@@ -64,15 +78,19 @@ export async function eventsFor(
 }
 
 /** Holds the buffer from `since` (a recording started), or releases it with `null`. */
-export function hold(tabId: number, since: number | null): void {
-  if (since === null) holdSince.delete(tabId);
-  else holdSince.set(tabId, since);
+export async function hold(tabId: number, since: number | null): Promise<void> {
+  const tabHolds = await loadHolds();
+  if (since === null) delete tabHolds[tabId];
+  else tabHolds[tabId] = since;
+  await holdsStore.setValue(tabHolds);
 }
 
 /** Drops a tab's buffer, e.g. when the tab closes. */
 export async function drop(tabId: number): Promise<void> {
   const all = await load();
   delete all[tabId];
-  holdSince.delete(tabId);
+  const tabHolds = await loadHolds();
+  delete tabHolds[tabId];
+  await holdsStore.setValue(tabHolds);
   scheduleSave();
 }

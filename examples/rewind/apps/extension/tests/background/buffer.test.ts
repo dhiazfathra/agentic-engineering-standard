@@ -41,15 +41,41 @@ describe("buffer", () => {
 
   it("hold keeps events older than the replay window, release drops them again", async () => {
     vi.setSystemTime(0);
-    hold(4, 0);
+    await hold(4, 0);
     await add(4, eventAt(0));
     vi.setSystemTime(200_000); // past REPLAY_MS
     await add(4, eventAt(200_000));
     expect(await raw(4)).toHaveLength(2);
 
-    hold(4, null);
+    await hold(4, null);
     await add(4, eventAt(200_001));
     expect((await raw(4)).map((e) => e.at)).toEqual([200_000, 200_001]);
+  });
+
+  it("persists the hold to storage.session and it survives a worker restart", async () => {
+    vi.setSystemTime(0);
+    await hold(7, 0);
+    const stored = (await fakeBrowser.storage.session.get("holds")) as {
+      holds: Record<number, number>;
+    };
+    expect(stored.holds[7]).toBe(0);
+
+    // Simulates an MV3 service-worker restart: in-memory module state is gone,
+    // so the next call must reload the hold from storage.session.
+    vi.resetModules();
+    const restarted = await import("../../lib/background/buffer");
+    vi.setSystemTime(200_000); // past REPLAY_MS
+    await restarted.add(7, eventAt(200_000));
+    expect(await restarted.raw(7)).toHaveLength(1);
+  });
+
+  it("clearing a hold removes it from storage.session too", async () => {
+    await hold(8, 100);
+    await hold(8, null);
+    const stored = (await fakeBrowser.storage.session.get("holds")) as {
+      holds: Record<number, number>;
+    };
+    expect(stored.holds[8]).toBeUndefined();
   });
 
   it("drop clears a tab's buffer and hold", async () => {

@@ -1,0 +1,184 @@
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 140px;
+  background: var(--rw-bg);
+}
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100vh;
+  font-family: var(--font-inter), sans-serif;
+  color: var(--rw-body);
+}
+
+.pickerButton {
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--rw-btn);
+  color: var(--rw-btn-fg);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.pickerButton:hover {
+  background: var(--rw-btn-hover);
+}
+
+.micNote {
+  font-size: 13px;
+  color: var(--rw-muted);
+}
+
+.stage {
+  position: relative;
+  height: 100vh;
+}
+
+.countdownPanel {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  background: rgba(20, 30, 30, 0.4);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  color: inherit;
+}
+
+.countdownCard {
+  background: #1f2a2a;
+  color: #fff;
+  border-radius: 16px;
+  padding: 26px 40px;
+  text-align: center;
+}
+
+.countdownTitle {
+  font:
+    600 22px Poppins,
+    sans-serif;
+}
+
+.countdownMic {
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+.countdownHint {
+  margin-top: 4px;
+  font-size: 14px;
+  color: #b8c2c3;
+}
+
+.bar {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 81;
+  height: 52px;
+  border-radius: 14px;
+  background: #141a1a;
+  border: 1px solid #2c3638;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.barButton {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #fff;
+}
+
+.barButton:hover:not(:disabled) {
+  background: #2c3638;
+}
+
+.barButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stopDot {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: #e35e5e;
+}
+
+.countLabel {
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 12px;
+  min-width: 140px;
+}
+
+.timeLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 0 10px;
+  font-variant-numeric: tabular-nums;
+  min-width: 90px;
+}
+
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 1.2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.divider {
+  width: 1px;
+  height: 22px;
+  background: #2c3638;
+}
+
+.micNoteBar {
+  position: absolute;
+  left: 50%;
+  bottom: 88px;
+  transform: translateX(-50%);
+  z-index: 81;
+  color: #fff;
+  background: #1f2a2a;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+}

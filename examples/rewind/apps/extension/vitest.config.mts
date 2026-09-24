@@ -11,8 +11,9 @@ export default defineConfig({
       provider: "v8",
       include: ["entrypoints/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
       exclude: [
-        // DOM bootstrap only; the popup e2e proves it mounts.
+        // DOM bootstrap only; the popup/recorder e2e proves it mounts.
         "entrypoints/popup/main.tsx",
+        "entrypoints/recorder/main.tsx",
       ],
       thresholds: {
         lines: 100,
