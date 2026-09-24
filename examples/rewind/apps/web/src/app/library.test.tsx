@@ -729,6 +729,56 @@ describe("rename", () => {
     expect(container.textContent).not.toContain(TITLE);
     expect(container.textContent).not.toContain("Second");
   });
+
+  it("each older success after a newer rollback keeps re-applying, in order", async () => {
+    // Three overlapping renames: v3 fails, then v1 succeeds, then v2
+    // succeeds. The screen must end on "Second" (v2), what the server holds.
+    let resolveFirst!: (r: Response) => void;
+    let resolveSecond!: (r: Response) => void;
+    let resolveThird!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveFirst = r)),
+      )
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveSecond = r)),
+      )
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveThird = r)),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mountOne();
+
+    type(startRename(), "First");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+    for (const [from, to] of [
+      ["First", "Second"],
+      ["Second", "Third"],
+    ]) {
+      click(q(`[aria-label="Actions for ${from}"]`));
+      click(menuItem("Rename"));
+      type(q('input[aria-label="Rewind title"]') as HTMLInputElement, to);
+      key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+    }
+    await flush();
+    expect(container.textContent).toContain("Third");
+
+    const settle = async (resolve: (r: Response) => void, status: number) =>
+      act(async () => {
+        resolve(new Response(JSON.stringify({}), { status }));
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+    await settle(resolveThird, 500);
+    expect(container.textContent).toContain(TITLE);
+    await settle(resolveFirst, 200);
+    expect(container.textContent).toContain("First");
+    await settle(resolveSecond, 200);
+    expect(container.textContent).toContain("Second");
+    expect(container.textContent).not.toContain("First");
+    expect(container.textContent).not.toContain("Third");
+  });
 });
 
 function deleteFirst() {

@@ -200,10 +200,7 @@ export function Library(props: Props) {
     const s = edits.current.get(key);
     if (!s || version <= s.savedVersion) return;
     edits.current.set(key, { ...s, saved: value, savedVersion: version });
-    if (s.rolledBack) {
-      edits.current.set(key, { ...edits.current.get(key)!, rolledBack: false });
-      reapply(value);
-    }
+    if (s.rolledBack) reapply(value);
   };
   const isCurrentEdit = (key: string, version: number) =>
     edits.current.get(key)?.version === version;
