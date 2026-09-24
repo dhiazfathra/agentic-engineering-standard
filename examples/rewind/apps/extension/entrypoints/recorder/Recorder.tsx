@@ -114,6 +114,9 @@ export default function Recorder() {
         events,
       });
 
+      await send({ type: "recording", tabId, since: null }).catch(
+        () => undefined,
+      );
       await browser.tabs.create({
         url: browser.runtime.getURL(`/editor.html?id=${id}`),
       });
@@ -123,13 +126,6 @@ export default function Recorder() {
       stoppingRef.current = false;
       setSaveError(
         err instanceof Error ? err.message : "Could not save the recording",
-      );
-    } finally {
-      // Release the background's hold on this tab's event buffer no matter
-      // how the save above ends, so a failure here can never leave the tab
-      // stuck.
-      await send({ type: "recording", tabId, since: null }).catch(
-        () => undefined,
       );
     }
   }

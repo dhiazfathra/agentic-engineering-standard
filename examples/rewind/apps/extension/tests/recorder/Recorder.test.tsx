@@ -275,7 +275,7 @@ describe("Recorder: mode=tab", () => {
     expect(putDraft).toHaveBeenCalledTimes(1);
   });
 
-  it("shows an error and still releases the hold when saving the recording fails", async () => {
+  it("shows an error and keeps the hold until the window closes when saving fails", async () => {
     putDraft.mockRejectedValueOnce(new Error("quota exceeded"));
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");
@@ -292,15 +292,30 @@ describe("Recorder: mode=tab", () => {
     await flush();
 
     expect(container.textContent).toContain("quota exceeded");
-    expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "recording", tabId: 5, since: null }),
-    );
+    const release = expect.objectContaining({
+      type: "recording",
+      tabId: 5,
+      since: null,
+    });
+    expect(send).not.toHaveBeenCalledWith(release);
     // Failure means no draft to open: the window must stay open, not close
     // on a recording that was never saved.
     expect(closeSpy).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new Event("pagehide"));
+    expect(send).toHaveBeenCalledWith(release);
   });
 
-  it("lets Stop be clicked again after a failed save, and the retry saves a draft", async () => {
+  it("lets Stop be clicked again after a failed save, and the retry keeps every event", async () => {
+    const event = { type: "console", at: 1 };
+    let held = true;
+    send.mockImplementation(
+      async (message: { type: string; since?: unknown }) => {
+        if (message.type === "recording") held = message.since !== null;
+        if (message.type === "events") return held ? [event] : [];
+        return undefined;
+      },
+    );
     putDraft.mockRejectedValueOnce(new Error("quota exceeded"));
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");
@@ -323,6 +338,7 @@ describe("Recorder: mode=tab", () => {
     await flush();
 
     expect(putDraft).toHaveBeenCalledTimes(2);
+    expect(putDraft.mock.calls[1]![0]).toMatchObject({ events: [event] });
     expect(closeSpy).toHaveBeenCalled();
   });
 
