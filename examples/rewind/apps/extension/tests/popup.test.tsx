@@ -386,6 +386,31 @@ describe("home", () => {
     expect(window.close).toHaveBeenCalled();
   });
 
+  it("shows an error instead of leaving the click silently dead when getMediaStreamId rejects", async () => {
+    (
+      browser.tabCapture.getMediaStreamId as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(new Error("Tab already has a capture stream"));
+    mount();
+    await flush();
+    const mainActions = qAll("[class*='mainAction']");
+    click(mainActions[1]!);
+    await flush();
+    expect(container.textContent).toContain("Tab already has a capture stream");
+    expect(window.close).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a generic message when the rejection isn't an Error", async () => {
+    (
+      browser.tabCapture.getMediaStreamId as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce("nope");
+    mount();
+    await flush();
+    const mainActions = qAll("[class*='mainAction']");
+    click(mainActions[1]!);
+    await flush();
+    expect(container.textContent).toContain("Could not start recording");
+  });
+
   it("records the desktop without a stream id", async () => {
     stubTabCapture(false);
     mount();
@@ -470,7 +495,9 @@ describe("drafts", () => {
   });
 
   it("shows a screenshot draft row and opens it", async () => {
-    await putDraft(draft("d1", new Date("2026-01-16").getTime()));
+    // Local time, not `new Date("2026-01-16")` (UTC midnight): west of UTC
+    // that parses back to 15 Jan via `formatDraftDate`'s local `getDate()`.
+    await putDraft(draft("d1", new Date(2026, 0, 16).getTime()));
     mount();
     await flush();
     click(q("[class*='draftsPill']"));
@@ -573,6 +600,7 @@ describe("settings", () => {
     await openSettings();
     const input = q("#rw-name") as HTMLInputElement;
     change(input, "Ada Lovelace");
+    blur(input);
     await flush();
     expect(await settings.getValue()).toMatchObject({
       reporterName: "Ada Lovelace",

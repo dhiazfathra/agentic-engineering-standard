@@ -11,6 +11,7 @@ import {
   type Settings,
 } from "../../lib/settings";
 import { applyTheme, type Theme } from "../../lib/theme";
+import { isHttpUrl } from "../../lib/url";
 import styles from "./popup.module.css";
 
 type View = "home" | "drafts" | "settings";
@@ -32,10 +33,6 @@ function hostPermissions() {
       };
     }
   ).permissions;
-}
-
-function isHttpUrl(url: string | undefined): boolean {
-  return url !== undefined && /^https?:\/\//.test(url);
 }
 
 function parsesAsHttpUrl(value: string): boolean {
@@ -160,14 +157,17 @@ export default function App() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [mics, setMics] = useState<MicOption[]>([]);
   const [replayError, setReplayError] = useState<string | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
   const [appUrlDraft, setAppUrlDraft] = useState("");
   const [appUrlError, setAppUrlError] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
   const [hasHostAccess, setHasHostAccess] = useState(true);
 
   useEffect(() => {
     void settingsItem.getValue().then((s) => {
       setSettings(s);
       setAppUrlDraft(s.appUrl);
+      setNameDraft(s.reporterName);
       applyTheme(s.theme);
     });
     return settingsItem.watch((next) => {
@@ -246,15 +246,24 @@ export default function App() {
 
   async function handleRecord() {
     const tabId = tab!.id;
-    if (effectiveMode === "desktop") {
-      await send({ type: "record", tabId, mode: "desktop" });
-    } else {
-      const streamId = await browser.tabCapture.getMediaStreamId({
-        targetTabId: tabId,
-      });
-      await send({ type: "record", tabId, mode: effectiveMode, streamId });
+    try {
+      if (effectiveMode === "desktop") {
+        await send({ type: "record", tabId, mode: "desktop" });
+      } else {
+        const streamId = await browser.tabCapture.getMediaStreamId({
+          targetTabId: tabId,
+        });
+        await send({ type: "record", tabId, mode: effectiveMode, streamId });
+      }
+      window.close();
+    } catch (err) {
+      // `getMediaStreamId` rejects when the tab already has a capture
+      // stream, and `send` rejects with no background listener; either way
+      // the popup must show it instead of leaving the click silently dead.
+      setRecordError(
+        err instanceof Error ? err.message : "Could not start recording",
+      );
     }
-    window.close();
   }
 
   async function handleSaveReplay() {
@@ -267,6 +276,11 @@ export default function App() {
       return;
     }
     window.close();
+  }
+
+  function commitReporterName(value: string) {
+    setNameDraft(value);
+    patch({ reporterName: value });
   }
 
   function commitAppUrl(value: string) {
@@ -459,6 +473,7 @@ export default function App() {
                 </svg>
                 {recordLabel}
               </button>
+              {recordError && <div className={styles.error}>{recordError}</div>}
               <button
                 type="button"
                 className={styles.micChip}
@@ -677,8 +692,9 @@ export default function App() {
                 id="rw-name"
                 type="text"
                 className={styles.textInput}
-                value={settings.reporterName}
-                onChange={(e) => patch({ reporterName: e.target.value })}
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={(e) => commitReporterName(e.target.value)}
               />
             </div>
 
@@ -766,9 +782,11 @@ export default function App() {
                 type="button"
                 className={styles.resetButton}
                 onClick={() =>
-                  void resetSettings().then(() =>
-                    setAppUrlDraft(DEFAULTS.appUrl),
-                  )
+                  void resetSettings().then(() => {
+                    setAppUrlDraft(DEFAULTS.appUrl);
+                    setAppUrlError(null);
+                    setNameDraft(DEFAULTS.reporterName);
+                  })
                 }
               >
                 Reset

@@ -27,21 +27,27 @@ test("screenshot: files a Rewind whose viewer shows the image, console and netwo
     await editor.waitForSelector("img[alt='Screenshot']");
 
     // Draw a box on the screenshot.
-    const image = editor.locator("img[alt='Screenshot']");
-    const box = (await image.boundingBox())!;
+    const screenshotImage = editor.locator("img[alt='Screenshot']");
+    const box = (await screenshotImage.boundingBox())!;
     await editor.mouse.move(box.x + 20, box.y + 20);
     await editor.mouse.down();
     await editor.mouse.move(box.x + 80, box.y + 80);
     await editor.mouse.up();
 
-    await editor.getByRole("button", { name: "Create link" }).click();
-
-    const viewer = await context.waitForEvent("page", {
-      predicate: (p) => p.url().includes("/r/"),
-    });
+    const [viewer] = await Promise.all([
+      context.waitForEvent("page", {
+        predicate: (p) => p.url().includes("/r/"),
+      }),
+      editor.getByRole("button", { name: "Create link" }).click(),
+    ]);
     await viewer.waitForLoadState();
 
     await expect(viewer.getByText("Media unavailable")).toHaveCount(0);
+    const image = viewer.locator("img");
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth))
+      .toBeGreaterThan(0);
     await viewer.getByRole("tab", { name: "Console" }).click();
     await expect(viewer.getByText("fixture loaded")).toBeVisible();
     await viewer.getByRole("tab", { name: "Network" }).click();

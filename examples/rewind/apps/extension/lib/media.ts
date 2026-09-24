@@ -117,7 +117,15 @@ export function cropTrack(
     await writer.close();
   })();
 
-  generator.addEventListener("ended", () => track.stop());
+  // `MediaStreamTrack.stop()` does not dispatch `ended`, so listening for it
+  // here would never fire when the caller stops the generator (the track
+  // this function returns): override `stop` itself to also stop the source,
+  // otherwise tab-capture stays live after the recording ends.
+  const stopGenerator = generator.stop.bind(generator);
+  generator.stop = () => {
+    stopGenerator();
+    track.stop();
+  };
 
   return generator as unknown as MediaStreamVideoTrack;
 }

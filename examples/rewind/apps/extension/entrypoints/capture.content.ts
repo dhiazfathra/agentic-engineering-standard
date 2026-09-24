@@ -23,11 +23,15 @@ const MIN_SIZE = 10;
 export function forwardMainEvent(
   e: MessageEvent,
   win: Window,
+  captureUserEvents: () => boolean,
   onEvent: (captured: CapturedEvent) => void,
 ): void {
   if (e.source !== win) return;
   const data = e.data as { source?: string; event?: CapturedEvent } | undefined;
   if (data?.source !== "rewind" || !data.event) return;
+  // MAIN world's `nav` events (pushState/replaceState/popstate) are a user
+  // navigation, same as clicks and input, so they honor the same setting.
+  if (data.event.kind === "nav" && !captureUserEvents()) return;
   onEvent(data.event);
 }
 
@@ -150,9 +154,14 @@ export default defineContentScript({
     });
 
     window.addEventListener("message", (e) => {
-      forwardMainEvent(e, window, (capturedEvent) => {
-        void send({ type: "event", event: capturedEvent });
-      });
+      forwardMainEvent(
+        e,
+        window,
+        () => captureUserEvents,
+        (capturedEvent) => {
+          void send({ type: "event", event: capturedEvent });
+        },
+      );
     });
     announceReady(window);
 

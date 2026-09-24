@@ -34,6 +34,9 @@ export function formatArgs(args: unknown[]): string {
   return args
     .map((a) => {
       if (typeof a === "string") return a;
+      // `message`/`stack` are non-enumerable, so `JSON.stringify(error)` is
+      // `"{}"` and the common `console.error(err)` pattern loses its text.
+      if (a instanceof Error) return a.stack ?? `${a.name}: ${a.message}`;
       try {
         const s = JSON.stringify(a);
         return s === undefined ? String(a) : s;

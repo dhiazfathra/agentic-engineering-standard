@@ -14,6 +14,7 @@ import { send } from "../../lib/messages";
 import { settings } from "../../lib/settings";
 import { spanSeconds, type Span } from "../../lib/timeline";
 import { applyTheme } from "../../lib/theme";
+import { isHttpUrl } from "../../lib/url";
 import styles from "./recorder.module.css";
 
 type Phase =
@@ -62,6 +63,8 @@ export default function Recorder() {
   const openStartRef = useRef<number | null>(null);
   const stoppingRef = useRef(false);
   const urlRef = useRef("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
 
   function closeOpenSpan(): void {
     if (openStartRef.current === null) return;
@@ -89,32 +92,45 @@ export default function Recorder() {
     if (!recorder) return discard();
     stoppingRef.current = true;
     closeOpenSpan();
-    const blob = await recorder.stop();
-    stopTracks();
+    try {
+      const blob = await recorder.stop();
+      stopTracks();
 
-    const spans = spansRef.current;
-    const events = await send<import("@rewind/schema").Event[]>({
-      type: "events",
-      tabId,
-      spans,
-    });
-    await send({ type: "recording", tabId, since: null });
+      const spans = spansRef.current;
+      const events = await send<import("@rewind/schema").Event[]>({
+        type: "events",
+        tabId,
+        spans,
+      });
 
-    const id = newId();
-    await putDraft({
-      id,
-      createdAt: Date.now(),
-      url: urlRef.current,
-      kind: "video",
-      blob,
-      durationSeconds: spanSeconds(spans),
-      events,
-    });
+      const id = newId();
+      await putDraft({
+        id,
+        createdAt: Date.now(),
+        url: urlRef.current,
+        kind: "video",
+        blob,
+        durationSeconds: spanSeconds(spans),
+        events,
+      });
 
-    await browser.tabs.create({
-      url: browser.runtime.getURL(`/editor.html?id=${id}`),
-    });
-    window.close();
+      await browser.tabs.create({
+        url: browser.runtime.getURL(`/editor.html?id=${id}`),
+      });
+      window.close();
+    } catch (err) {
+      stopTracks();
+      setSaveError(
+        err instanceof Error ? err.message : "Could not save the recording",
+      );
+    } finally {
+      // Release the background's hold on this tab's event buffer no matter
+      // how the save above ends, so a failure here can never leave the tab
+      // stuck (or a retry blocked by `stoppingRef` staying true forever).
+      await send({ type: "recording", tabId, since: null }).catch(
+        () => undefined,
+      );
+    }
   }
 
   function startCountdownAndRecord(video: MediaStreamTrack): void {
@@ -152,32 +168,64 @@ export default function Recorder() {
     let cancelled = false;
 
     async function init(): Promise<void> {
-      const current = await settings.getValue();
-      applyTheme(current.theme);
-      urlRef.current = (await browser.tabs.get(tabId)).url ?? "";
-
-      if (mode === "desktop") {
-        setPhase("desktop-picker");
-        return;
-      }
-
-      const stream = await openTabStream(streamId);
-      let video = stream.getVideoTracks()[0]!;
-
-      if (mode === "area") {
-        const rect = await send<import("../../lib/messages").Rect | null>({
-          type: "area",
-          tabId,
-        });
+      try {
+        const current = await settings.getValue();
+        applyTheme(current.theme);
+        const tabUrl = (await browser.tabs.get(tabId)).url;
         if (cancelled) return;
-        if (rect === null) {
+
+        // The popup only offers capture on an http(s) tab, but the tab can
+        // navigate away between the click and this point; a missing or
+        // non-http(s) URL must never become a draft (it crashes the editor
+        // and the upload path, both of which call `new URL(draft.url)`).
+        if (!isHttpUrl(tabUrl)) {
           window.close();
           return;
         }
-        video = cropTrack(video, rect);
-      }
+        urlRef.current = tabUrl;
 
-      if (!cancelled) await afterVideoTrack(video);
+        if (mode === "desktop") {
+          setPhase("desktop-picker");
+          return;
+        }
+
+        const stream = await openTabStream(streamId);
+        if (cancelled) {
+          // React 18 StrictMode runs this effect twice in development; the
+          // first run's cleanup must release the stream it opened, or it
+          // stays live (and the second run re-requests the same stream id).
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        let video = stream.getVideoTracks()[0]!;
+
+        if (mode === "area") {
+          const rect = await send<import("../../lib/messages").Rect | null>({
+            type: "area",
+            tabId,
+          });
+          if (cancelled) {
+            video.stop();
+            return;
+          }
+          if (rect === null) {
+            window.close();
+            return;
+          }
+          video = cropTrack(video, rect);
+        }
+
+        // No await separates this from the last `cancelled` check above, so
+        // `cancelled` cannot have flipped true in between; the guard is
+        // defensive against future code inserting one.
+        /* v8 ignore next */
+        if (!cancelled) await afterVideoTrack(video);
+      } catch (err) {
+        if (cancelled) return;
+        setInitError(
+          err instanceof Error ? err.message : "Could not start recording",
+        );
+      }
     }
 
     function release(): void {
@@ -252,7 +300,15 @@ export default function Recorder() {
     setMicMuted((m) => !m);
   }
 
-  if (phase === "starting") return null;
+  if (phase === "starting" && !initError) return null;
+
+  if (initError) {
+    return (
+      <div className={styles.picker}>
+        <p>{initError}</p>
+      </div>
+    );
+  }
 
   if (phase === "desktop-picker") {
     return (
@@ -311,6 +367,12 @@ export default function Recorder() {
 
       {micState === "unavailable" && (
         <div className={styles.micNoteBar}>Microphone unavailable</div>
+      )}
+
+      {saveError && (
+        <div className={styles.micNoteBar}>
+          Could not save the recording: {saveError}
+        </div>
       )}
 
       <div className={styles.bar}>

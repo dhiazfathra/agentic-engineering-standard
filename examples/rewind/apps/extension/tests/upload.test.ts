@@ -35,6 +35,11 @@ describe("defaultTitle", () => {
       defaultTitle("screenshot", `https://a.co/${"p".repeat(300)}`),
     ).toHaveLength(200);
   });
+
+  it("falls back to a plain verb instead of throwing on an invalid url", () => {
+    expect(defaultTitle("screenshot", "")).toBe("Screenshot");
+    expect(defaultTitle("video", "not-a-url")).toBe("Recording");
+  });
 });
 
 function okFetch() {

@@ -233,7 +233,7 @@ describe("cropTrack", () => {
     vi.unstubAllGlobals();
   });
 
-  it("crops every frame and closes the source track when the generator ends", async () => {
+  it("crops every frame and stops the source track when the generator is stopped", async () => {
     const track = {
       stop: vi.fn(() => closeCalls.push("track")),
     } as unknown as MediaStreamVideoTrack;
@@ -251,7 +251,10 @@ describe("cropTrack", () => {
     expect(written).toHaveLength(2);
     expect(written[0]).toBeInstanceOf(MockVideoFrame);
 
-    (generator as unknown as EventTarget).dispatchEvent(new Event("ended"));
+    // `MediaStreamTrack.stop()` never fires `ended`, so `cropTrack` must
+    // stop the source itself when its caller stops the generator track.
+    generator.stop();
+    expect(closeCalls).toContain("generator");
     expect(closeCalls).toContain("track");
   });
 });

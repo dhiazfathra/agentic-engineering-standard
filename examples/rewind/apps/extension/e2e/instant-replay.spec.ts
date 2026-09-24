@@ -29,11 +29,12 @@ test("instant replay: saves the last few seconds and files a playable video", as
     ]);
     await editor.waitForSelector("video", { timeout: 30_000 });
 
-    await editor.getByRole("button", { name: "Create link" }).click();
-
-    const viewer = await context.waitForEvent("page", {
-      predicate: (p) => p.url().includes("/r/"),
-    });
+    const [viewer] = await Promise.all([
+      context.waitForEvent("page", {
+        predicate: (p) => p.url().includes("/r/"),
+      }),
+      editor.getByRole("button", { name: "Create link" }).click(),
+    ]);
     await viewer.waitForLoadState();
     await expect(viewer.getByText("Media unavailable")).toHaveCount(0);
 

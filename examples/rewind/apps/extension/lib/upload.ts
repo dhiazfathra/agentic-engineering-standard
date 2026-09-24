@@ -21,9 +21,17 @@ export function defaultTitle(
   kind: "screenshot" | "video" | "replay",
   url: string,
 ): string {
-  const u = new URL(url);
   const verb = kind === "screenshot" ? "Screenshot" : "Recording";
-  return `${verb} of ${u.host}${u.pathname}`.slice(0, TITLE_MAX);
+  // A bad or missing draft `url` must not crash the editor's render; fall
+  // back to a title with no host/path instead of throwing on `new URL`.
+  let location = "";
+  try {
+    const u = new URL(url);
+    location = ` of ${u.host}${u.pathname}`;
+  } catch {
+    // no-op: keep the plain verb as the title.
+  }
+  return `${verb}${location}`.slice(0, TITLE_MAX);
 }
 
 async function checkOk(res: Response, step: string): Promise<void> {

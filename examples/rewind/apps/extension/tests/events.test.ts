@@ -78,6 +78,17 @@ describe("formatArgs", () => {
   it("falls back to String() when JSON.stringify returns undefined", () => {
     expect(formatArgs([undefined])).toBe(String(undefined));
   });
+
+  it("formats an Error by its stack, not JSON.stringify's '{}'", () => {
+    const err = new Error("boom");
+    expect(formatArgs([err])).toBe(err.stack);
+  });
+
+  it("falls back to name: message when an Error has no stack", () => {
+    const err = new Error("boom");
+    err.stack = undefined;
+    expect(formatArgs([err])).toBe("Error: boom");
+  });
 });
 
 describe("describeElement", () => {

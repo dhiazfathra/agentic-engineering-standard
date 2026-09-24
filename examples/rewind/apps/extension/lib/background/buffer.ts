@@ -14,6 +14,9 @@ import { toRewindEvents } from "../timeline";
 // break `toRewindEvents`/`createRewind.parse` downstream, or that could
 // never actually age out of the buffer.
 const MAX_CLOCK_SKEW_MS = 5000;
+// Same cap `toRewindEvents` applies at flush; cut here too, at the trust
+// boundary, so an oversized `text` never sits in `storage.session` (10 MB).
+const MAX_TEXT_LENGTH = 10_000;
 
 const capturedEventSchema = z.object({
   at: z.number().finite(),
@@ -27,7 +30,7 @@ export function parseCapturedEvent(value: unknown): CapturedEvent | null {
   const result = capturedEventSchema.safeParse(value);
   if (!result.success) return null;
   if (result.data.at > Date.now() + MAX_CLOCK_SKEW_MS) return null;
-  return result.data;
+  return { ...result.data, text: result.data.text.slice(0, MAX_TEXT_LENGTH) };
 }
 
 type TabBuffers = Record<number, CapturedEvent[]>;

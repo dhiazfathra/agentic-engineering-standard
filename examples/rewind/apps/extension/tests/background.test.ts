@@ -294,13 +294,15 @@ describe("background", () => {
     it("stops the loop and clears snapshots when turned off", async () => {
       await updateSettings({ instantReplay: true });
       background.main();
+      await vi.waitFor(() => expect(replay.isRunning()).toBe(true));
+      const clearAlarmSpy = vi.spyOn(browser.alarms, "clear");
+
       await updateSettings({ instantReplay: false });
-      await vi.waitFor(async () => {
-        const stored = (await fakeBrowser.storage.local.get("settings")) as {
-          settings: { instantReplay: boolean };
-        };
-        expect(stored.settings.instantReplay).toBe(false);
-      });
+
+      await vi.waitFor(() => expect(replay.isRunning()).toBe(false));
+      await vi.waitFor(() =>
+        expect(clearAlarmSpy).toHaveBeenCalledWith("replay"),
+      );
     });
 
     it("restarts the loop from the alarm when the setting is on", async () => {

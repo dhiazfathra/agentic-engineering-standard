@@ -117,8 +117,9 @@ describe("save", () => {
   it("builds a replay draft from a tab's snapshots and opens the editor", async () => {
     await fakeBrowser.tabs.update(0, { url: "https://a.co/x" });
     const blob = new Blob(["jpeg"], { type: "image/jpeg" });
-    await putSnapshot({ tabId: 0, at: 1000, blob });
-    await putSnapshot({ tabId: 0, at: 2000, blob });
+    // Within the last `REPLAY_MS` window, which `save` now reads from.
+    await putSnapshot({ tabId: 0, at: Date.now() - 2000, blob });
+    await putSnapshot({ tabId: 0, at: Date.now() - 1000, blob });
     const createSpy = vi.spyOn(browser.tabs, "create");
 
     const result = await save(0);
@@ -133,9 +134,26 @@ describe("save", () => {
     });
   });
 
+  it("ignores snapshots older than the replay window even when pruning was skipped", async () => {
+    // Simulates a capture failure (e.g. tab went non-http(s) mid-tick),
+    // which leaves `pruneSnapshots` unrun: `save` must still only read the
+    // last `REPLAY_MS`, not everything ever stored for the tab.
+    await fakeBrowser.tabs.update(0, { url: "https://a.co/x" });
+    const blob = new Blob(["jpeg"], { type: "image/jpeg" });
+    await putSnapshot({ tabId: 0, at: Date.now() - 10 * 60_000, blob });
+    await putSnapshot({ tabId: 0, at: Date.now() - 1000, blob });
+
+    const result = await save(0);
+
+    expect("id" in result).toBe(true);
+    const id = (result as { id: string }).id;
+    const draft = await getDraft(id);
+    expect(draft?.frames).toHaveLength(1);
+  });
+
   it("falls back to an empty url when the tab has none", async () => {
     const blob = new Blob(["jpeg"], { type: "image/jpeg" });
-    await putSnapshot({ tabId: 2, at: 1000, blob });
+    await putSnapshot({ tabId: 2, at: Date.now() - 1000, blob });
     vi.spyOn(browser.tabs, "get").mockResolvedValue({ id: 2 } as never);
     vi.spyOn(browser.tabs, "create").mockResolvedValue({} as never);
 

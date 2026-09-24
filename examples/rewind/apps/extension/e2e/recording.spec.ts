@@ -44,11 +44,12 @@ test("desktop recording: records, stops and files a playable video", async () =>
       recorder.getByRole("button", { name: "Stop" }).click(),
     ]);
     await editor.waitForSelector("video");
-    await editor.getByRole("button", { name: "Create link" }).click();
-
-    const viewer = await context.waitForEvent("page", {
-      predicate: (p) => p.url().includes("/r/"),
-    });
+    const [viewer] = await Promise.all([
+      context.waitForEvent("page", {
+        predicate: (p) => p.url().includes("/r/"),
+      }),
+      editor.getByRole("button", { name: "Create link" }).click(),
+    ]);
     await viewer.waitForLoadState();
     await expect(viewer.getByText("Media unavailable")).toHaveCount(0);
 

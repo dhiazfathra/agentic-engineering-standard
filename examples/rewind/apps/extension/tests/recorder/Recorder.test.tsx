@@ -66,6 +66,7 @@ function fakeStream(tracks: ReturnType<typeof fakeTrack>[]) {
   return {
     getVideoTracks: () => tracks.filter((t) => t.kind === "video"),
     getAudioTracks: () => tracks.filter((t) => t.kind === "audio"),
+    getTracks: () => tracks,
   };
 }
 
@@ -274,6 +275,120 @@ describe("Recorder: mode=tab", () => {
     expect(putDraft).toHaveBeenCalledTimes(1);
   });
 
+  it("shows an error and still releases the hold when saving the recording fails", async () => {
+    putDraft.mockRejectedValueOnce(new Error("quota exceeded"));
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+    send.mockClear();
+
+    const stopButton = container.querySelector(
+      'button[aria-label="Stop"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(container.textContent).toContain("quota exceeded");
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "recording", tabId: 5, since: null }),
+    );
+    // Failure means no draft to open: the window must stay open, not close
+    // on a recording that was never saved.
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it("still releases the hold when the release message itself rejects", async () => {
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+    send.mockImplementation(async (message: { type: string }) => {
+      if (message.type === "recording") throw new Error("no listener");
+      if (message.type === "events") return [];
+      return undefined;
+    });
+
+    const stopButton = container.querySelector(
+      'button[aria-label="Stop"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(putDraft).toHaveBeenCalled();
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
+  it("shows an error instead of a blank window when starting the recorder fails", async () => {
+    tabsGet.mockRejectedValueOnce(new Error("tab was closed"));
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush();
+
+    expect(container.textContent).toContain("tab was closed");
+  });
+
+  it("falls back to a generic message when the init failure isn't an Error", async () => {
+    tabsGet.mockRejectedValueOnce("nope");
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush();
+
+    expect(container.textContent).toContain("Could not start recording");
+  });
+
+  it("falls back to a generic message when saving fails with a non-Error", async () => {
+    putDraft.mockRejectedValueOnce("nope");
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+
+    const stopButton = container.querySelector(
+      'button[aria-label="Stop"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(container.textContent).toContain("Could not save the recording");
+  });
+
+  it("unmounting while the tab URL fetch is pending aborts init without error", async () => {
+    let resolveTab: (t: { url: string }) => void = () => undefined;
+    tabsGet.mockImplementationOnce(
+      () => new Promise((resolve) => (resolveTab = resolve)),
+    );
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    act(() => {
+      root.unmount();
+    });
+    resolveTab({ url: "https://example.com/page" });
+    await flush();
+
+    expect(openTabStream).not.toHaveBeenCalled();
+  });
+
+  it("unmounting before init fails does not render an error", async () => {
+    let rejectTab: (err: unknown) => void = () => undefined;
+    tabsGet.mockImplementationOnce(
+      () => new Promise((_resolve, reject) => (rejectTab = reject)),
+    );
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    act(() => {
+      root.unmount();
+    });
+    rejectTab(new Error("boom"));
+    await flush();
+
+    expect(container.textContent).not.toContain("boom");
+  });
+
   it("clicking the countdown panel pauses and resumes the countdown", async () => {
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");
@@ -447,21 +562,16 @@ describe("Recorder: mode=tab", () => {
     expect(closeSpy).toHaveBeenCalled();
   });
 
-  it("defaults the draft's url to empty when the tab has none", async () => {
+  it("closes instead of recording when the tab has no http(s) url", async () => {
+    // A missing/non-http(s) url must never become a draft: `defaultTitle`
+    // and `fileDraft` both call `new URL(draft.url)` and would crash on "".
     tabsGet.mockResolvedValueOnce({ url: undefined });
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");
-    await flush(3000);
-
-    const stopButton = container.querySelector(
-      'button[aria-label="Stop"]',
-    ) as HTMLButtonElement;
-    await act(async () => {
-      stopButton.click();
-      await Promise.resolve();
-    });
     await flush();
-    expect(putDraft).toHaveBeenCalledWith(expect.objectContaining({ url: "" }));
+
+    expect(closeSpy).toHaveBeenCalled();
+    expect(putDraft).not.toHaveBeenCalled();
   });
 
   it("mic on: no audio track on the mic stream still counts as mic on", async () => {

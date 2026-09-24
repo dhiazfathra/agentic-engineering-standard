@@ -57,7 +57,10 @@ export function stop(): void {
 export async function save(
   tabId: number,
 ): Promise<{ id: string } | { error: string }> {
-  const snapshots = await snapshotsFor(tabId, 0);
+  // `pruneSnapshots` only runs on a successful tick, so a capture failure
+  // (e.g. tab not http(s)) can leave older snapshots in the store; read only
+  // the last `REPLAY_MS` window here rather than trusting the prune to have run.
+  const snapshots = await snapshotsFor(tabId, Date.now() - REPLAY_MS);
   if (snapshots.length === 0) return { error: "No replay yet" };
 
   const first = snapshots[0]!.at;

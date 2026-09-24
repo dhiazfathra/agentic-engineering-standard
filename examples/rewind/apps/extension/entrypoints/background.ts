@@ -53,6 +53,9 @@ async function onInstantReplayChange(enabled: boolean): Promise<void> {
   } else {
     replay.stop();
     await clearSnapshots();
+    // Otherwise the service worker keeps waking every 30s forever, since
+    // an alarm outlives the setting that created it.
+    await browser.alarms.clear(REPLAY_ALARM);
   }
 }
 

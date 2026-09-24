@@ -45,6 +45,7 @@ describe("forwardMainEvent", () => {
         data: { source: "rewind", event: capturedEvent },
       } as unknown as MessageEvent,
       window,
+      () => true,
       onEvent,
     );
     expect(onEvent).toHaveBeenCalledWith(capturedEvent);
@@ -58,6 +59,7 @@ describe("forwardMainEvent", () => {
         data: { source: "rewind", event: {} },
       } as unknown as MessageEvent,
       window,
+      () => true,
       onEvent,
     );
     expect(onEvent).not.toHaveBeenCalled();
@@ -68,6 +70,7 @@ describe("forwardMainEvent", () => {
     forwardMainEvent(
       { source: window, data: { source: "other" } } as unknown as MessageEvent,
       window,
+      () => true,
       onEvent,
     );
     expect(onEvent).not.toHaveBeenCalled();
@@ -78,9 +81,50 @@ describe("forwardMainEvent", () => {
     forwardMainEvent(
       { source: window, data: { source: "rewind" } } as unknown as MessageEvent,
       window,
+      () => true,
       onEvent,
     );
     expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it("drops a nav event relayed from MAIN world when captureUserEvents is off", () => {
+    const onEvent = vi.fn();
+    const navEvent = {
+      at: 1,
+      kind: "nav" as const,
+      text: "Navigated to a.co/x",
+      isError: false,
+    };
+    forwardMainEvent(
+      {
+        source: window,
+        data: { source: "rewind", event: navEvent },
+      } as unknown as MessageEvent,
+      window,
+      () => false,
+      onEvent,
+    );
+    expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it("still forwards non-nav MAIN world events when captureUserEvents is off", () => {
+    const onEvent = vi.fn();
+    const logEvent = {
+      at: 1,
+      kind: "log" as const,
+      text: "hi",
+      isError: false,
+    };
+    forwardMainEvent(
+      {
+        source: window,
+        data: { source: "rewind", event: logEvent },
+      } as unknown as MessageEvent,
+      window,
+      () => false,
+      onEvent,
+    );
+    expect(onEvent).toHaveBeenCalledWith(logEvent);
   });
 });
 
@@ -303,6 +347,25 @@ describe("entrypoint", () => {
     offInput.name = "off";
     document.body.appendChild(offInput);
     offInput.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(sendSpy).not.toHaveBeenCalled();
+
+    // A `nav` event relayed from the MAIN world (pushState/replaceState/
+    // popstate) is a user navigation too, so it is also gated by the
+    // setting through the real `window.addEventListener("message")` wiring.
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          source: "rewind",
+          event: {
+            at: 1,
+            kind: "nav",
+            text: "Navigated to a.co/y",
+            isError: false,
+          },
+        },
+        source: window,
+      } as MessageEventInit),
+    );
     expect(sendSpy).not.toHaveBeenCalled();
 
     // Toggle back on: clicks resume.
