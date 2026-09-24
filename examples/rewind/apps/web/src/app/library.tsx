@@ -172,6 +172,9 @@ export function Library(props: Props) {
       entry.queued = value;
       return;
     }
+    // Idle, so the rendered value is what the server last accepted; other
+    // paths (e.g. deleting a folder) change fields without going through here.
+    entry.confirmed = previous;
     entry.sending = true;
     void send(value).then((res) => {
       if (res) entry.confirmed = value;

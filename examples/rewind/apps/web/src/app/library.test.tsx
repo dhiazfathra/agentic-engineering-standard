@@ -1387,6 +1387,85 @@ describe("drag and drop", () => {
     expect(container.textContent).toContain("Could not move Rewind");
   });
 
+  it("a failed move after folder was deleted rolls back to unfiled, not the deleted folder", async () => {
+    let callCount = 0;
+    const fetchMock = vi.fn(() => {
+      callCount++;
+      // First call: move to F1 succeeds
+      if (callCount === 1) {
+        return Promise.resolve(
+          new Response(JSON.stringify({}), { status: 200 }),
+        );
+      }
+      // Second call: delete F1 succeeds
+      if (callCount === 2) {
+        return Promise.resolve(
+          new Response(JSON.stringify({}), { status: 200 }),
+        );
+      }
+      // Third call: move to F2 fails
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 500 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // Start with Rewind A unfiled and two folders
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", folderId: null })]}
+        folders={[
+          folder({ id: "f1", name: "Folder1" }),
+          folder({ id: "f2", name: "Folder2" }),
+        ]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+
+    // Move A into folder F1; PATCH succeeds
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to Folder1"));
+    await flush();
+
+    // Delete folder F1 and close undo toast so DELETE is sent; succeeds
+    click(q('[aria-label="Actions for folder Folder1"]'));
+    click(menuItem("Delete folder"));
+    click(toastButtons("Close")[0]);
+    await flush();
+    // Now A is unfiled (folderId null)
+
+    // Move A into folder F2; PATCH fails
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to Folder2"));
+    await flush();
+
+    // Assert A rolls back to unfiled (not F1), error toast shows
+    expect(container.textContent).toContain("Could not move Rewind");
+    // Verify the three fetch calls: 1. PATCH move to F1 (success), 2. DELETE
+    // folder F1 (success), 3. PATCH move to F2 (failed with 500).
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folderId: "f1" }),
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/folders/f1", {
+      method: "DELETE",
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folderId: "f2" }),
+    });
+
+    // `moveRewindToFolder` returns early when the target equals the current
+    // folder, so an unfiled A sends nothing here. Rolled back to the deleted
+    // "f1" instead, it would send a fourth PATCH.
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to All Rewinds"));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("onDragOver over a column and a folder prevents the default", () => {
     mountBoard();
     const column = qAll("section")[1];
