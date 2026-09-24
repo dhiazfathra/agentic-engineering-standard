@@ -6,12 +6,15 @@ export default defineConfig({
   test: {
     // WXT reads every file in entrypoints/ as an entrypoint, so tests live in tests/.
     include: ["tests/**/*.test.{ts,tsx}"],
+    setupFiles: ["fake-indexeddb/auto"],
     coverage: {
       provider: "v8",
-      include: ["entrypoints/**/*.{ts,tsx}"],
+      include: ["entrypoints/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
       exclude: [
-        // DOM bootstrap only; the popup e2e proves it mounts.
+        // DOM bootstrap only; the popup/recorder e2e proves it mounts.
         "entrypoints/popup/main.tsx",
+        "entrypoints/recorder/main.tsx",
+        "entrypoints/editor/main.tsx",
       ],
       thresholds: {
         lines: 100,
