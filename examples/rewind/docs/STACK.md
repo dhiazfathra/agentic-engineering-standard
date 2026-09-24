@@ -68,6 +68,7 @@ examples/rewind/
     STACK.md               this file
     extension-manual-check.md  browser-only checks the e2e cannot run
     design/                Rewind.dc.html, a reference copy of the design
+    adr/                   decisions that are costly to reverse (0001 media keys, 0002 deferred library deletes)
 ```
 
 ## Environment
