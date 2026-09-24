@@ -46,12 +46,15 @@ examples/rewind/
   apps/
     web/                   Next.js 16.3.6, App Router
       src/app/api/         rewinds, folders, recording-links, uploads, health routes
+      src/app/page.tsx     the library: server component, loads rewinds+folders, renders <Library>
+      src/app/library.tsx  the library client component (view/board/palette/drag/toast state) + library.module.css
       src/app/r/[id]/      the viewer: page.tsx (server, loads the Rewind) + viewer.tsx (client)
-      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts, http.ts (request parsing, DB error mapping), rewinds.ts (getRewind), viewer.ts (viewer helpers)
+      src/components/      toast.tsx (useToast: plain toasts auto-clear, action toasts carry Undo/× with no timer)
+      src/lib/             env.ts, parse-env.ts, db.ts, storage.ts, http.ts (request parsing, DB error mapping), rewinds.ts (getRewind, listRewinds, listFolders), viewer.ts (viewer helpers), library.ts (param parsing, folder filter/counts, board columns, palette items, reducer), theme.ts (dark mode init script/storage), copy-link.ts
       src/db/              schema.ts, seed.ts (row builder) + seed-cli.ts (entry point)
       src/styles/          tokens.css (copied from the design), fonts.ts (next/font/google)
       drizzle/             generated SQL migrations
-      e2e/                 Playwright specs (health, design tokens, rewinds upload flow, viewer); the web server seeds its fresh e2e.db
+      e2e/                 Playwright specs (health, design tokens, rewinds upload flow, viewer, library); the web server seeds its fresh e2e.db
     extension/             WXT, Manifest V3 for Chrome and Firefox from one codebase
       entrypoints/         background.ts, capture-main.content.ts (MAIN world) + capture.content.ts (ISOLATED), popup/, recorder/, editor/
       lib/                 pure helpers (events, timeline, buffer, settings, drafts, upload) and media.ts (browser-only capture and Mediabunny wrappers)
