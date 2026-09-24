@@ -568,7 +568,7 @@ export default function App() {
                   onClick={() =>
                     void browser.tabs.create({
                       url: browser.runtime.getURL(
-                        `/editor.html?id=${draft.id}` as never,
+                        `/editor.html?id=${draft.id}`,
                       ),
                     })
                   }

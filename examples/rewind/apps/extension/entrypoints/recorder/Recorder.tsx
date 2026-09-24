@@ -110,7 +110,7 @@ export default function Recorder() {
     });
 
     await browser.tabs.create({
-      url: browser.runtime.getURL(`/editor.html?id=${id}` as never),
+      url: browser.runtime.getURL(`/editor.html?id=${id}`),
     });
     window.close();
   }

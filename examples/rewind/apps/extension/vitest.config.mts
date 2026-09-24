@@ -14,6 +14,7 @@ export default defineConfig({
         // DOM bootstrap only; the popup/recorder e2e proves it mounts.
         "entrypoints/popup/main.tsx",
         "entrypoints/recorder/main.tsx",
+        "entrypoints/editor/main.tsx",
       ],
       thresholds: {
         lines: 100,

@@ -52,8 +52,7 @@ export async function takeScreenshot(
   });
 
   await browser.tabs.create({
-    // `editor.html` is added by T7; cast until WXT's `PublicPath` union knows it.
-    url: browser.runtime.getURL(`/editor.html?id=${id}` as never),
+    url: browser.runtime.getURL(`/editor.html?id=${id}`),
   });
 
   return id;

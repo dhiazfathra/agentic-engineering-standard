@@ -11,9 +11,7 @@ export async function openRecorder(
   if (streamId) params.set("stream", streamId);
   await browser.windows.create({
     type: "popup",
-    // `recorder.html` is added by T6; WXT's generated `PublicPath` union
-    // does not know it yet, so the path needs a cast until then.
-    url: browser.runtime.getURL(`/recorder.html?${params.toString()}` as never),
+    url: browser.runtime.getURL(`/recorder.html?${params.toString()}`),
     width: 420,
     height: 260,
   });
