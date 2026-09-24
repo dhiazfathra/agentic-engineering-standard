@@ -20,6 +20,7 @@ import {
   filterByFolder,
   folderCounts,
   libraryReducer,
+  nextFolderName,
   type LibraryView,
 } from "@/lib/library";
 import type { FolderListItem, RewindListItem } from "@/lib/rewinds";
@@ -177,6 +178,57 @@ export function Library(props: Props) {
     );
   };
 
+  const createFolder = async () => {
+    const res = await write(
+      "/api/folders",
+      "POST",
+      { name: nextFolderName(folders) },
+      () => {},
+      "Could not create folder",
+    );
+    if (!res) return;
+    const row = (await res.json()) as FolderListItem;
+    const folder = { ...row, createdAt: new Date(row.createdAt) };
+    dispatch({ type: "addFolder", folder });
+    setEditing({ kind: "folder", id: folder.id });
+  };
+
+  const renameFolder = (f: FolderListItem, name: string) => {
+    setEditing(null);
+    if (name === "" || name === f.name) return;
+    dispatch({ type: "renameFolder", id: f.id, name });
+    void write(
+      `/api/folders/${f.id}`,
+      "PATCH",
+      { name },
+      () => dispatch({ type: "renameFolder", id: f.id, name: f.name }),
+      "Could not rename folder",
+    );
+  };
+
+  const deleteFolder = (f: FolderListItem) => {
+    const rewindIds = rewinds
+      .filter((r) => r.folderId === f.id)
+      .map((r) => r.id);
+    dispatch({ type: "removeFolder", id: f.id });
+    if (folderId === f.id) goToFolder(undefined);
+    deleteLater(
+      `Folder “${f.name}” deleted`,
+      `/api/folders/${f.id}`,
+      () => dispatch({ type: "restoreFolder", folder: f, rewindIds }),
+      "Could not delete folder",
+    );
+  };
+
+  const folderMenu = (e: ReactMouseEvent<HTMLElement>, f: FolderListItem) =>
+    openMenu(e, `Actions for folder ${f.name}`, [
+      {
+        label: "Rename",
+        onSelect: () => setEditing({ kind: "folder", id: f.id }),
+      },
+      { label: "Delete folder", danger: true, onSelect: () => deleteFolder(f) },
+    ]);
+
   const rewindMenu = (e: ReactMouseEvent<HTMLElement>, r: RewindListItem) =>
     openMenu(e, `Actions for ${r.title}`, [
       {
@@ -270,19 +322,53 @@ export function Library(props: Props) {
         >
           All Rewinds
         </button>
-        <div className={styles.foldersHeading}>Folders</div>
-        {folders.map((f) => (
+        <div className={styles.foldersHeading}>
+          Folders
           <button
-            key={f.id}
             type="button"
-            className={`${styles.navItem} ${folderId === f.id ? styles.navActive : ""}`}
-            onClick={() => goToFolder(f.id)}
+            className={styles.moreButton}
+            aria-label="New folder"
+            onClick={() => void createFolder()}
           >
-            <span className={styles.dot} />
-            <span className={styles.navLabel}>{f.name}</span>
-            <span className={styles.navCount}>{counts[f.id] ?? 0}</span>
+            +
           </button>
-        ))}
+        </div>
+        {folders.map((f) =>
+          editing?.kind === "folder" && editing.id === f.id ? (
+            <InlineRename
+              key={f.id}
+              label="Folder name"
+              value={f.name}
+              onDone={(name) => renameFolder(f, name)}
+              onCancel={() => setEditing(null)}
+            />
+          ) : (
+            <div
+              key={f.id}
+              className={styles.folderRow}
+              onContextMenu={(e) => folderMenu(e, f)}
+            >
+              <button
+                type="button"
+                className={`${styles.navItem} ${folderId === f.id ? styles.navActive : ""}`}
+                onClick={() => goToFolder(f.id)}
+              >
+                <span className={styles.dot} />
+                <span className={styles.navLabel}>{f.name}</span>
+                <span className={styles.navCount}>{counts[f.id] ?? 0}</span>
+              </button>
+              <button
+                type="button"
+                className={styles.moreButton}
+                aria-label={`Actions for folder ${f.name}`}
+                aria-haspopup="menu"
+                onClick={(e) => folderMenu(e, f)}
+              >
+                ⋯
+              </button>
+            </div>
+          ),
+        )}
       </aside>
 
       <div className={styles.main}>

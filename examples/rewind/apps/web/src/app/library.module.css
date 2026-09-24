@@ -81,7 +81,10 @@
 }
 
 .foldersHeading {
-  padding: 18px 10px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 4px 6px 10px;
   font-size: 12px;
   color: var(--rw-hint);
   font-weight: 500;
@@ -531,4 +534,14 @@
   font: inherit;
   font-weight: 600;
   outline: none;
+}
+
+.folderRow {
+  display: flex;
+  align-items: center;
+}
+
+.folderRow .navItem {
+  flex: 1;
+  min-width: 0;
 }

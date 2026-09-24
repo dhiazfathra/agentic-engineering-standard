@@ -736,3 +736,182 @@ describe("delete with undo", () => {
     expect(container.textContent).toContain("Could not delete Rewind");
   });
 });
+
+function jsonFetch(body: unknown, status = 201) {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve(new Response(JSON.stringify(body), { status })),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function mountFolders(folderId?: string) {
+  mount(
+    <Library
+      rewinds={[
+        rewind({ id: "in", title: "Filed", folderId: "f1" }),
+        rewind({ id: "out", title: "Loose", folderId: null }),
+      ]}
+      folders={[folder()]}
+      view="grid"
+      folderId={folderId}
+    />,
+  );
+}
+
+function folderButton(): HTMLElement {
+  return qAll("button").find((b) => b.textContent?.includes("Checkout bugs"))!;
+}
+
+describe("folders", () => {
+  it("+ posts the next untitled name and opens it for rename", async () => {
+    const fetchMock = jsonFetch({
+      id: "f2",
+      name: "Untitled folder 1",
+      createdAt: new Date().toISOString(),
+    });
+    mountFolders();
+    click(q('[aria-label="New folder"]'));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/folders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Untitled folder 1" }),
+    });
+    const input = q('input[aria-label="Folder name"]') as HTMLInputElement;
+    expect(input.value).toBe("Untitled folder 1");
+
+    fetchMock.mockClear();
+    type(input, "Payments");
+    key(input, "Enter");
+    await flush();
+    expect(container.textContent).toContain("Payments");
+    expect(fetchMock).toHaveBeenCalledWith("/api/folders/f2", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "Payments" }),
+    });
+  });
+
+  it("a failed create adds nothing and toasts", async () => {
+    stubFetch(false);
+    mountFolders();
+    click(q('[aria-label="New folder"]'));
+    await flush();
+    expect(container.querySelector("input")).toBeNull();
+    expect(container.textContent).toContain("Could not create folder");
+  });
+
+  it("the folder menu opens from ⋯ and on right-click", () => {
+    mountFolders();
+    click(q('[aria-label="Actions for folder Checkout bugs"]'));
+    expect(qAll('[role="menuitem"]').map((i) => i.textContent)).toEqual([
+      "Rename",
+      "Delete folder",
+    ]);
+    key(q('[role="menu"]'), "Escape");
+    act(() => {
+      folderButton().dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true }),
+      );
+    });
+    expect(q('[role="menu"]').getAttribute("aria-label")).toBe(
+      "Actions for folder Checkout bugs",
+    );
+  });
+
+  function renameFolderInput(): HTMLInputElement {
+    click(q('[aria-label="Actions for folder Checkout bugs"]'));
+    click(menuItem("Rename"));
+    return q('input[aria-label="Folder name"]') as HTMLInputElement;
+  }
+
+  it("rename: Escape cancels, empty and unchanged send nothing", () => {
+    const fetchMock = stubFetch();
+    mountFolders();
+    let input = renameFolderInput();
+    type(input, "Nope");
+    key(input, "Escape");
+    input = renameFolderInput();
+    type(input, " ");
+    key(input, "Enter");
+    input = renameFolderInput();
+    blur(input);
+    expect(container.textContent).toContain("Checkout bugs");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a failed rename reverts and toasts", async () => {
+    stubFetch(false);
+    mountFolders();
+    const input = renameFolderInput();
+    type(input, "Doomed");
+    key(input, "Enter");
+    await flush();
+    expect(container.textContent).toContain("Checkout bugs");
+    expect(container.textContent).not.toContain("Doomed");
+    expect(container.textContent).toContain("Could not rename folder");
+  });
+
+  function deleteFolder() {
+    click(q('[aria-label="Actions for folder Checkout bugs"]'));
+    click(menuItem("Delete folder"));
+  }
+
+  it("delete hides the folder, unfiles its Rewinds, and × sends DELETE", async () => {
+    const fetchMock = stubFetch();
+    mountFolders();
+    deleteFolder();
+    expect(folderButton()).toBeUndefined();
+    expect(container.textContent).toContain("Folder “Checkout bugs” deleted");
+    expect(q('a[href="/r/in"]')).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+
+    click(toastButtons("Close")[0]);
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/folders/f1", {
+      method: "DELETE",
+    });
+  });
+
+  it("Undo restores the folder and refiles its Rewinds", () => {
+    const fetchMock = stubFetch();
+    mountFolders();
+    deleteFolder();
+    click(toastButtons("Undo")[0]);
+    expect(folderButton().textContent).toContain("1");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a failed DELETE restores the folder and toasts", async () => {
+    stubFetch(false);
+    mountFolders();
+    deleteFolder();
+    click(toastButtons("Close")[0]);
+    await flush();
+    expect(folderButton()).toBeTruthy();
+    expect(container.textContent).toContain("Could not delete folder");
+  });
+
+  it("pagehide sends a pending folder DELETE with keepalive", async () => {
+    const fetchMock = stubFetch();
+    mountFolders();
+    deleteFolder();
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/folders/f1", {
+      method: "DELETE",
+      keepalive: true,
+    });
+  });
+
+  it("deleting the folder being viewed returns to All Rewinds", () => {
+    stubFetch();
+    mountFolders("f1");
+    deleteFolder();
+    expect(replace).toHaveBeenCalledWith("/");
+  });
+});

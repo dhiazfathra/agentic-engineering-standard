@@ -88,12 +88,12 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ## T6: Folders
 
-- [ ] `+` posts "Untitled folder N" and opens it for rename.
-- [ ] Folder context menu: Rename (inline, same rules as T5), Delete
+- [x] `+` posts "Untitled folder N" and opens it for rename.
+- [x] Folder context menu: Rename (inline, same rules as T5), Delete
       with Undo and `×` (unfiles its Rewinds on screen; `DELETE` on `×`).
-- [ ] Deleting the folder being viewed returns to All Rewinds.
-- [ ] `?folder=<unknown>` shows "Folder not found" and no Rewinds.
-- [ ] DOM tests for create, rename, delete, undo, failures.
+- [x] Deleting the folder being viewed returns to All Rewinds.
+- [x] `?folder=<unknown>` shows "Folder not found" and no Rewinds.
+- [x] DOM tests for create, rename, delete, undo, failures.
 
 **Dependencies:** T3, T5 (shares the deferred-delete code) · **Scope:** M
 
