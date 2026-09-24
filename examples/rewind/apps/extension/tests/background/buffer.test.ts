@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { add, drop, eventsFor, hold, raw } from "../../lib/background/buffer";
+import {
+  add,
+  drop,
+  eventsFor,
+  hold,
+  parseCapturedEvent,
+  raw,
+} from "../../lib/background/buffer";
 import type { CapturedEvent } from "../../lib/messages";
 
 const BASE = 1_000_000;
@@ -92,6 +99,26 @@ describe("buffer", () => {
       cold.add(9, eventAt(BASE + 1)),
     ]);
     expect((await cold.raw(9)).map((e) => e.at)).toEqual([BASE, BASE + 1]);
+  });
+
+  it("parseCapturedEvent accepts a well-shaped event", () => {
+    expect(parseCapturedEvent(eventAt(BASE))).toEqual(eventAt(BASE));
+  });
+
+  it.each([
+    ["non-string text", { ...eventAt(BASE), text: 123 }],
+    ["unknown kind", { ...eventAt(BASE), kind: "not-a-kind" }],
+    ["non-finite at", { ...eventAt(BASE), at: Number.POSITIVE_INFINITY }],
+    ["missing isError", { at: BASE, kind: "log", text: "x" }],
+    ["far-future at", { ...eventAt(BASE), at: BASE + 10_000 }],
+    ["not an object", "just a string"],
+  ])("parseCapturedEvent rejects %s", (_name, value) => {
+    expect(parseCapturedEvent(value)).toBeNull();
+  });
+
+  it("add silently drops a forged event that fails validation", async () => {
+    await add(10, { ...eventAt(BASE), kind: "bogus" });
+    expect(await raw(10)).toEqual([]);
   });
 
   it("debounces the save to storage.session", async () => {

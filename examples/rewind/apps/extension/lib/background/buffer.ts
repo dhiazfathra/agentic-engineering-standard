@@ -1,9 +1,34 @@
 import type { Event } from "@rewind/schema";
+import { eventKind } from "@rewind/schema";
+import { z } from "zod";
 import { storage } from "wxt/utils/storage";
 import { trim } from "../buffer";
 import type { CapturedEvent } from "../messages";
 import type { Span } from "../timeline";
 import { toRewindEvents } from "../timeline";
+
+// A page script can forge `window.postMessage({ source: "rewind", event })`,
+// which the content script relays to `add` unvalidated. This is the trust
+// boundary: every sender (content script, recorder, popup) routes through
+// `add`, so validating here covers all of them. Reject anything that would
+// break `toRewindEvents`/`createRewind.parse` downstream, or that could
+// never actually age out of the buffer.
+const MAX_CLOCK_SKEW_MS = 5000;
+
+const capturedEventSchema = z.object({
+  at: z.number().finite(),
+  kind: eventKind,
+  text: z.string(),
+  isError: z.boolean(),
+});
+
+/** Validates an unknown value as a `CapturedEvent`, or returns `null` to drop it silently. */
+export function parseCapturedEvent(value: unknown): CapturedEvent | null {
+  const result = capturedEventSchema.safeParse(value);
+  if (!result.success) return null;
+  if (result.data.at > Date.now() + MAX_CLOCK_SKEW_MS) return null;
+  return result.data;
+}
 
 type TabBuffers = Record<number, CapturedEvent[]>;
 
@@ -58,19 +83,17 @@ function scheduleSave(): void {
 /** Adds an event to a tab's buffer, trimmed to the replay window/hold and the event cap. */
 export async function add(
   tabId: number,
-  capturedEvent: CapturedEvent,
+  capturedEvent: unknown,
 ): Promise<void> {
+  const event = parseCapturedEvent(capturedEvent);
+  if (!event) return;
   const all = await load();
   const tabHolds = await loadHolds();
   // No `await` between this read and the write below: two concurrent `add`s
   // on the same cold tab would otherwise both read the buffer as empty
   // before either writes, and the second write would drop the first event.
   const events = all[tabId] ?? [];
-  all[tabId] = trim(
-    [...events, capturedEvent],
-    Date.now(),
-    tabHolds[tabId] ?? null,
-  );
+  all[tabId] = trim([...events, event], Date.now(), tabHolds[tabId] ?? null);
   scheduleSave();
 }
 
