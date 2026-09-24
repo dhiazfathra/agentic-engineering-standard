@@ -474,16 +474,9 @@ export function Library(props: Props) {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen((open) => {
-          if (open) {
-            setQuery("");
-            setSelected(0);
-            return false;
-          }
-          setQuery("");
-          setSelected(0);
-          return true;
-        });
+        setQuery("");
+        setSelected(0);
+        setPaletteOpen((open) => !open);
       }
     };
     window.addEventListener("keydown", onKeyDown);

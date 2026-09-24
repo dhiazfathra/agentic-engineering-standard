@@ -202,7 +202,7 @@ export function libraryReducer(
         ...state,
         folders: [...state.folders, action.folder],
         rewinds: state.rewinds.map((r) =>
-          action.rewindIds.includes(r.id)
+          action.rewindIds.includes(r.id) && r.folderId === null
             ? { ...r, folderId: action.folder.id }
             : r,
         ),

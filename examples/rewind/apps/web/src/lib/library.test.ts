@@ -333,4 +333,13 @@ describe("libraryReducer", () => {
     );
     expect(next.rewinds[0]).toBe(other);
   });
+
+  it("leaves a rewind moved to another folder since the delete alone", () => {
+    const moved = { ...rewind, folderId: "f2" };
+    const next = libraryReducer(
+      { rewinds: [moved], folders: [] },
+      { type: "restoreFolder", folder, rewindIds: ["r1"] },
+    );
+    expect(next.rewinds[0]).toBe(moved);
+  });
 });

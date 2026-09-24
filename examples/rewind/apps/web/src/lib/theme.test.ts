@@ -9,10 +9,28 @@ afterEach(() => {
 });
 
 describe("THEME_INIT_SCRIPT", () => {
-  it("is a fixed string that reads rewind-theme in a try/catch", () => {
-    expect(THEME_INIT_SCRIPT).toContain("rewind-theme");
-    expect(THEME_INIT_SCRIPT).toContain("try{");
-    expect(THEME_INIT_SCRIPT).toContain("catch(e){}");
+  const run = () => new Function(THEME_INIT_SCRIPT)();
+
+  it("adds rw-dark when the stored theme is dark", () => {
+    localStorage.setItem("rewind-theme", "dark");
+    run();
+    expect(document.body.classList.contains("rw-dark")).toBe(true);
+  });
+
+  it("leaves rw-dark off for light or an empty store", () => {
+    run();
+    expect(document.body.classList.contains("rw-dark")).toBe(false);
+    localStorage.setItem("rewind-theme", "light");
+    run();
+    expect(document.body.classList.contains("rw-dark")).toBe(false);
+  });
+
+  it("does not throw when storage is blocked", () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(run).not.toThrow();
+    expect(document.body.classList.contains("rw-dark")).toBe(false);
   });
 });
 
