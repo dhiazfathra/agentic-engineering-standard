@@ -75,6 +75,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
   const mediaRef = useRef<HTMLVideoElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const statusRequest = useRef(0);
 
   const duration = rewind.durationSeconds ?? 0;
   const isVideo = rewind.kind === "video";
@@ -202,6 +203,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
   const onStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const next = e.target.value as RewindStatus;
     const previous = status;
+    const request = ++statusRequest.current;
     setStatus(next);
     try {
       const res = await fetch(`/api/rewinds/${rewind.id}`, {
@@ -211,6 +213,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch {
+      if (request !== statusRequest.current) return;
       setStatus(previous);
       showToast({ text: "Could not update status", tone: "error" });
     }
