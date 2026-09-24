@@ -155,8 +155,18 @@ export function Library(props: Props) {
   // false), and when it does roll back, it must restore the last value
   // the server actually accepted (`savedValue`), not the value that was
   // on screen when this edit started — that captured value can itself be
-  // an unconfirmed optimistic write from an even earlier edit.
-  type EditState = { version: number; saved: unknown; savedVersion: number };
+  // an unconfirmed optimistic write from an even earlier edit. A rollback
+  // can also fire before an *older*, still-pending edit's success lands
+  // (`rolledBack`): if that success is left to just update `saved`, the
+  // screen stays on the rolled-back value while the server holds the
+  // newer one. `markSaved` re-dispatches in that case, unless a newer
+  // edit has since begun and reset `rolledBack` to false.
+  type EditState = {
+    version: number;
+    saved: unknown;
+    savedVersion: number;
+    rolledBack: boolean;
+  };
   const edits = useRef(new Map<string, EditState>());
   const beginEdit = (key: string, current: unknown) => {
     const prev = edits.current.get(key);
@@ -165,13 +175,35 @@ export function Library(props: Props) {
       version,
       saved: prev ? prev.saved : current,
       savedVersion: prev?.savedVersion ?? 0,
+      rolledBack: false,
     });
     return version;
   };
-  const markSaved = (key: string, version: number, value: unknown) => {
+  /** Runs `apply` and flags the edit as rolled back, but only while it's
+   * still the current edit for `key` — an older edit's failure must not
+   * clobber a newer one that's still pending. */
+  const rollbackEdit = (key: string, version: number, apply: () => void) => {
+    if (!isCurrentEdit(key, version)) return;
+    // isCurrentEdit is true, so the entry for `key` is guaranteed to exist.
+    edits.current.set(key, { ...edits.current.get(key)!, rolledBack: true });
+    apply();
+  };
+  /** Records the server-accepted value, then, if a rollback fired for an
+   * older edit while this one was still in flight, re-applies it so the
+   * screen matches what the server actually holds. */
+  const markSaved = <T,>(
+    key: string,
+    version: number,
+    value: T,
+    reapply: (value: T) => void,
+  ) => {
     const s = edits.current.get(key);
-    if (s && version > s.savedVersion)
-      edits.current.set(key, { ...s, saved: value, savedVersion: version });
+    if (!s || version <= s.savedVersion) return;
+    edits.current.set(key, { ...s, saved: value, savedVersion: version });
+    if (s.rolledBack) {
+      edits.current.set(key, { ...edits.current.get(key)!, rolledBack: false });
+      reapply(value);
+    }
   };
   const isCurrentEdit = (key: string, version: number) =>
     edits.current.get(key)?.version === version;
@@ -240,17 +272,20 @@ export function Library(props: Props) {
       `/api/rewinds/${r.id}`,
       "PATCH",
       { title },
-      () => {
-        if (isCurrentEdit(key, version))
+      () =>
+        rollbackEdit(key, version, () =>
           dispatch({
             type: "rename",
             id: r.id,
             title: savedValue<string>(key),
-          });
-      },
+          }),
+        ),
       "Could not rename Rewind",
     ).then((res) => {
-      if (res) markSaved(key, version, title);
+      if (res)
+        markSaved(key, version, title, (title) =>
+          dispatch({ type: "rename", id: r.id, title }),
+        );
     });
   };
 
@@ -289,17 +324,20 @@ export function Library(props: Props) {
       `/api/folders/${f.id}`,
       "PATCH",
       { name },
-      () => {
-        if (isCurrentEdit(key, version))
+      () =>
+        rollbackEdit(key, version, () =>
           dispatch({
             type: "renameFolder",
             id: f.id,
             name: savedValue<string>(key),
-          });
-      },
+          }),
+        ),
       "Could not rename folder",
     ).then((res) => {
-      if (res) markSaved(key, version, name);
+      if (res)
+        markSaved(key, version, name, (name) =>
+          dispatch({ type: "renameFolder", id: f.id, name }),
+        );
     });
   };
 
@@ -432,17 +470,20 @@ export function Library(props: Props) {
       `/api/rewinds/${r.id}`,
       "PATCH",
       { status },
-      () => {
-        if (isCurrentEdit(key, version))
+      () =>
+        rollbackEdit(key, version, () =>
           dispatch({
             type: "setStatus",
             id: r.id,
             status: savedValue<RewindStatus>(key),
-          });
-      },
+          }),
+        ),
       "Could not move Rewind",
     ).then((res) => {
-      if (res) markSaved(key, version, status);
+      if (res)
+        markSaved(key, version, status, (status) =>
+          dispatch({ type: "setStatus", id: r.id, status }),
+        );
     });
   };
 
@@ -455,17 +496,20 @@ export function Library(props: Props) {
       `/api/rewinds/${r.id}`,
       "PATCH",
       { folderId: folder },
-      () => {
-        if (isCurrentEdit(key, version))
+      () =>
+        rollbackEdit(key, version, () =>
           dispatch({
             type: "setFolder",
             id: r.id,
             folderId: savedValue<string | null>(key),
-          });
-      },
+          }),
+        ),
       "Could not move Rewind",
     ).then((res) => {
-      if (res) markSaved(key, version, folder);
+      if (res)
+        markSaved(key, version, folder, (folderId) =>
+          dispatch({ type: "setFolder", id: r.id, folderId }),
+        );
     });
   };
 
@@ -502,7 +546,7 @@ export function Library(props: Props) {
       const dragged = rewinds.find((x) => x.id === dragRewindId(e));
       // Runs inside the onDrop event handler, not during render; the
       // identical call shape for setRewindStatus above (also reads
-      // editVersions.current via beginEdit) is not flagged, so this is
+      // edits.current via beginEdit) is not flagged, so this is
       // the rule misfiring on this one call site.
       if (dragged)
         // eslint-disable-next-line react-hooks/refs

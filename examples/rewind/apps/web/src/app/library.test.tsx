@@ -686,6 +686,49 @@ describe("rename", () => {
     expect(container.textContent).toContain("Second");
     expect(container.textContent).not.toContain("First");
   });
+
+  it("an older success after a newer rollback re-applies the confirmed value", async () => {
+    // "First" (v1) stays pending; "Second" (v2) fails first and rolls back
+    // to the last confirmed title. When "First" then succeeds, the screen
+    // must show "First" — not the rolled-back title left on screen by v2's
+    // failure — since the server now holds "First".
+    let resolveFirst!: (r: Response) => void;
+    let resolveSecond!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveFirst = r)),
+      )
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveSecond = r)),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mountOne();
+
+    type(startRename(), "First");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+
+    click(q('[aria-label="Actions for First"]'));
+    click(menuItem("Rename"));
+    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+    await flush();
+    expect(container.textContent).toContain("Second");
+
+    await act(async () => {
+      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.textContent).toContain(TITLE);
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.textContent).toContain("First");
+    expect(container.textContent).not.toContain(TITLE);
+    expect(container.textContent).not.toContain("Second");
+  });
 });
 
 function deleteFirst() {
@@ -1007,6 +1050,48 @@ describe("folders", () => {
     expect(container.textContent).not.toContain("Checkout bugs");
   });
 
+  it("an older success after a newer rollback re-applies the confirmed name", async () => {
+    let resolveFirst!: (r: Response) => void;
+    let resolveSecond!: (r: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementationOnce(
+          () => new Promise<Response>((r) => (resolveFirst = r)),
+        )
+        .mockImplementationOnce(
+          () => new Promise<Response>((r) => (resolveSecond = r)),
+        ),
+    );
+    mountFolders();
+
+    let input = renameFolderInput();
+    type(input, "First");
+    key(input, "Enter");
+    click(q('[aria-label="Actions for folder First"]'));
+    click(menuItem("Rename"));
+    input = q('input[aria-label="Folder name"]') as HTMLInputElement;
+    type(input, "Second");
+    key(input, "Enter");
+    await flush();
+    expect(container.textContent).toContain("Second");
+
+    await act(async () => {
+      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.textContent).toContain("Checkout bugs");
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.textContent).toContain("First");
+    expect(container.textContent).not.toContain("Checkout bugs");
+    expect(container.textContent).not.toContain("Second");
+  });
+
   function deleteFolder() {
     click(q('[aria-label="Actions for folder Checkout bugs"]'));
     click(menuItem("Delete folder"));
@@ -1229,6 +1314,45 @@ describe("drag and drop", () => {
     expect(qAll("section")[0].textContent).not.toContain(TITLE);
   });
 
+  it("an older status success after a newer rollback re-applies the confirmed status", async () => {
+    // First drop (triage) stays pending; second drop (done) fails first
+    // and rolls back to "new". When the first drop then succeeds, the
+    // card must land in "triage" — the server-confirmed status — not stay
+    // on the rolled-back "new" column.
+    let resolveFirst!: (r: Response) => void;
+    let resolveSecond!: (r: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementationOnce(
+          () => new Promise<Response>((r) => (resolveFirst = r)),
+        )
+        .mockImplementationOnce(
+          () => new Promise<Response>((r) => (resolveSecond = r)),
+        ),
+    );
+    mountBoard();
+
+    drop(qAll("section")[1], "a");
+    drop(qAll("section")[3], "a");
+    await flush();
+
+    await act(async () => {
+      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(qAll("section")[0].textContent).toContain(TITLE);
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(qAll("section")[1].textContent).toContain(TITLE);
+    expect(qAll("section")[0].textContent).not.toContain(TITLE);
+    expect(qAll("section")[3].textContent).not.toContain(TITLE);
+  });
+
   it("dropping a card on a sidebar folder sends PATCH folderId", async () => {
     const fetchMock = stubFetch();
     mount(
@@ -1448,6 +1572,57 @@ describe("drag and drop", () => {
     await flush();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("Could not move Rewind");
+  });
+
+  it("an older folder-move success after a newer rollback re-applies the confirmed folder", async () => {
+    // Move to f1 (v1) stays pending; move to f2 (v2) fails first and
+    // rolls back to the original folder (null). When the move to f1
+    // then succeeds, the Rewind must end up in f1 — asserted indirectly
+    // through the "same folder" no-op guard, as above.
+    let resolveFirst!: (r: Response) => void;
+    let resolveSecond!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveFirst = r)),
+      )
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveSecond = r)),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", folderId: null })]}
+        folders={[
+          folder({ id: "f1", name: "Checkout bugs" }),
+          folder({ id: "f2", name: "Other" }),
+        ]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to Checkout bugs"));
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to Other"));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to Checkout bugs"));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("onDragOver over a column and a folder prevents the default", () => {
