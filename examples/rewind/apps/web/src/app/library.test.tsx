@@ -896,6 +896,41 @@ describe("folders", () => {
     expect(container.textContent).toContain("Could not rename folder");
   });
 
+  it("an older failed rename does not roll back a newer successful one", async () => {
+    let resolveFirst!: (r: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockImplementationOnce(
+          () => new Promise<Response>((r) => (resolveFirst = r)),
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
+        ),
+    );
+    mountFolders();
+
+    let input = renameFolderInput();
+    type(input, "First");
+    key(input, "Enter");
+    click(q('[aria-label="Actions for folder First"]'));
+    click(menuItem("Rename"));
+    input = q('input[aria-label="Folder name"]') as HTMLInputElement;
+    type(input, "Second");
+    key(input, "Enter");
+    await flush();
+    expect(container.textContent).toContain("Second");
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(container.textContent).toContain("Second");
+    expect(container.textContent).not.toContain("Checkout bugs");
+  });
+
   function deleteFolder() {
     click(q('[aria-label="Actions for folder Checkout bugs"]'));
     click(menuItem("Delete folder"));

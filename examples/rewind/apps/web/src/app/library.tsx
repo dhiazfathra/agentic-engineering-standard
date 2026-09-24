@@ -261,12 +261,17 @@ export function Library(props: Props) {
   const renameFolder = (f: FolderListItem, name: string) => {
     setEditing(null);
     if (name === "" || name === f.name) return;
+    const key = `${f.id}:name`;
+    const version = beginEdit(key);
     dispatch({ type: "renameFolder", id: f.id, name });
     void write(
       `/api/folders/${f.id}`,
       "PATCH",
       { name },
-      () => dispatch({ type: "renameFolder", id: f.id, name: f.name }),
+      () => {
+        if (isCurrentEdit(key, version))
+          dispatch({ type: "renameFolder", id: f.id, name: f.name });
+      },
       "Could not rename folder",
     );
   };
