@@ -6,6 +6,7 @@ import {
   Conversion,
   Input,
   Output,
+  QUALITY_MEDIUM,
   WebMOutputFormat,
   canEncode,
 } from "mediabunny";
@@ -198,7 +199,7 @@ export async function encodeFrames(
   const codec = (await canEncode("vp9")) ? "vp9" : "vp8";
   const target = new BufferTarget();
   const output = new Output({ format: new WebMOutputFormat(), target });
-  const source = new CanvasSource(canvas, { codec });
+  const source = new CanvasSource(canvas, { codec, quality: QUALITY_MEDIUM });
   output.addVideoTrack(source);
   await output.start();
 

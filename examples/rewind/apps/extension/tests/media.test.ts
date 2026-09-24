@@ -47,6 +47,7 @@ vi.mock("mediabunny", () => ({
   Conversion: { init: conversionInit },
   Input: MockInput,
   Output: MockOutput,
+  QUALITY_MEDIUM: "medium",
   WebMOutputFormat: MockWebMOutputFormat,
   canEncode: canEncodeMock,
 }));
