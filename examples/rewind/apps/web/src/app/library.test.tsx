@@ -922,6 +922,16 @@ describe("folders", () => {
     deleteFolder();
     expect(replace).toHaveBeenCalledWith("/");
   });
+
+  it("Undo on the folder being viewed shows its name again", () => {
+    stubFetch();
+    mountFolders("f1");
+    const title = () => q("header > div").textContent;
+    deleteFolder();
+    expect(title()).toBe("All Rewinds");
+    click(toastButtons("Undo")[0]);
+    expect(title()).toBe("Checkout bugs");
+  });
 });
 
 function dataTransferStub(id: string) {

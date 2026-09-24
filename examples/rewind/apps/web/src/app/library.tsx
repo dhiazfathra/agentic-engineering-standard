@@ -139,7 +139,8 @@ export function Library(props: Props) {
   >(undefined);
   // Set right before navigating away from the folder being deleted, so a
   // stale `folderId` prop (the URL replace lands a tick later) does not
-  // flash "Folder not found" in between. Cleared once the prop catches up.
+  // flash "Folder not found" in between. Only consulted while that folder
+  // is absent, so an Undo that restores it shows its name again.
   const [leavingFolderId, setLeavingFolderId] = useState<string | null>(null);
 
   const showError = useCallback(
@@ -332,11 +333,12 @@ export function Library(props: Props) {
   const counts = useMemo(() => folderCounts(rewinds), [rewinds]);
   const activeFolder =
     folderId === undefined ? undefined : folders.find((f) => f.id === folderId);
-  const folderNotFound =
-    folderId !== undefined && !activeFolder && leavingFolderId !== folderId;
+  const leaving =
+    folderId !== undefined && !activeFolder && leavingFolderId === folderId;
+  const folderNotFound = folderId !== undefined && !activeFolder && !leaving;
   const shownRewinds = folderNotFound ? [] : filterByFolder(rewinds, folderId);
   const title =
-    folderId === undefined || leavingFolderId === folderId
+    folderId === undefined || leaving
       ? "All Rewinds"
       : folderNotFound
         ? "Folder not found"

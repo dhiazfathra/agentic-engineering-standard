@@ -78,7 +78,10 @@ test.describe("library", () => {
     ).toBeVisible();
   });
 
-  test("folder create, rename and delete survive reload", async ({ page }) => {
+  test("folder create, rename and delete survive reload", async ({
+    page,
+    request,
+  }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "New folder" }).click();
     const nameInput = page.getByRole("textbox", { name: "Folder name" });
@@ -118,9 +121,21 @@ test.describe("library", () => {
       page.getByRole("button", { name: /^E2E folder renamed/ }),
     ).toHaveCount(0);
     // The DELETE is deferred until the toast closes (spec: no timer, sent
-    // on Undo/× or on leaving the page). Close it here so the reload below
-    // checks the database, not a keepalive request racing the reload.
+    // on × or on leaving the page). Close it, then wait for the database to
+    // drop the folder, so the reload below checks the database rather than
+    // racing the in-flight DELETE.
     await page.getByRole("button", { name: "Close" }).click();
+    await expect
+      .poll(async () =>
+        (
+          (await (await request.get("/api/folders")).json()) as {
+            name: string;
+          }[]
+        )
+          .map((f) => f.name)
+          .includes("E2E folder renamed"),
+      )
+      .toBe(false);
 
     await page.reload();
     await expect(

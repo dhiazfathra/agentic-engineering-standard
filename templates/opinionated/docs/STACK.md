@@ -79,9 +79,12 @@ break when it hydrates:
 
 ## Drizzle
 
-- Drizzle's `sql` tag renders a column reference unqualified. In a
-  correlated subquery, `${events.rewindId} = ${rewinds.id}` becomes
-  `"rewindId" = "id"`, and `id` binds to the inner table's own column:
-  the count is silently 0. Write both sides qualified by hand
+- In a single-table `select` (no joins) or a `returning` list, Drizzle's
+  SQLite dialect strips the table name from every column interpolated
+  into the projection, including inside a `sql` tag. So a correlated
+  subquery in the projection, `${events.rewindId} = ${rewinds.id}`,
+  becomes `"rewindId" = "id"`, `id` binds to the inner table's own
+  column, and the count is silently 0. Joined selects and `where`
+  clauses keep the qualifier. Write both sides qualified by hand
   (`"events"."rewindId" = "rewinds"."id"`) and assert the value against
   a real database, not a mocked `db`.
