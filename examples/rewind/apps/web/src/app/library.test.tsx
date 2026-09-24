@@ -83,6 +83,8 @@ afterEach(() => {
   });
   container.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("cards", () => {
@@ -332,5 +334,405 @@ describe("board view", () => {
     expect(cols[2].textContent).toContain("Drop Rewinds here");
     expect(cols[0].textContent).not.toContain("Drop Rewinds here");
     expect(cols[0].querySelector('a[href="/r/a"]')).toBeTruthy();
+  });
+});
+
+function stubFetch(ok = true) {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({}), { status: ok ? 200 : 500 }),
+    ),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+async function flush() {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+  });
+}
+
+function key(el: HTMLElement, k: string) {
+  act(() => {
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+  });
+}
+
+function type(input: HTMLInputElement, value: string) {
+  act(() => {
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    setter.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+function blur(el: HTMLElement) {
+  act(() => {
+    el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+  });
+}
+
+function menuItem(label: string): HTMLElement {
+  return qAll('[role="menuitem"]').find((b) => b.textContent === label)!;
+}
+
+function mountOne(view: "grid" | "list" | "board" = "grid") {
+  mount(
+    <Library
+      rewinds={[rewind()]}
+      folders={[]}
+      view={view}
+      folderId={undefined}
+    />,
+  );
+}
+
+const TITLE = "Checkout fails after applying coupon";
+
+function openRewindMenu() {
+  click(q(`[aria-label="Actions for ${TITLE}"]`));
+}
+
+function startRename(): HTMLInputElement {
+  openRewindMenu();
+  click(menuItem("Rename"));
+  return q('input[aria-label="Rewind title"]') as HTMLInputElement;
+}
+
+describe("context menu", () => {
+  it("opens from the ⋯ button with Rename and Delete, focused", () => {
+    mountOne();
+    openRewindMenu();
+    const menu = q('[role="menu"]');
+    expect(menu.getAttribute("aria-label")).toBe(`Actions for ${TITLE}`);
+    expect(qAll('[role="menuitem"]').map((i) => i.textContent)).toEqual([
+      "Rename",
+      "Delete Rewind",
+    ]);
+    expect(document.activeElement).toBe(menuItem("Rename"));
+  });
+
+  it("Escape closes it and returns focus to the ⋯ button", () => {
+    mountOne();
+    const trigger = q(`[aria-label="Actions for ${TITLE}"]`);
+    click(trigger);
+    key(q('[role="menu"]'), "Escape");
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("other keys leave it open", () => {
+    mountOne();
+    openRewindMenu();
+    key(q('[role="menu"]'), "a");
+    expect(container.querySelector('[role="menu"]')).toBeTruthy();
+  });
+
+  it.each(["grid", "list", "board"] as const)(
+    "opens on right-click in the %s view and closes on the backdrop",
+    (view) => {
+      mountOne(view);
+      const target = q('[aria-label="Copy link"]').closest(
+        view === "list" ? '[role="row"]' : "div",
+      ) as HTMLElement;
+      act(() => {
+        target.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            clientX: 40,
+            clientY: 50,
+          }),
+        );
+      });
+      const menu = q('[role="menu"]');
+      expect(menu.style.left).toBe("40px");
+      expect(menu.style.top).toBe("50px");
+      click(menu.previousElementSibling as HTMLElement);
+      expect(container.querySelector('[role="menu"]')).toBeNull();
+    },
+  );
+
+  it("closes on a right-click on the backdrop", () => {
+    mountOne();
+    openRewindMenu();
+    act(() => {
+      q('[role="menu"]').previousElementSibling!.dispatchEvent(
+        new MouseEvent("contextmenu", { bubbles: true }),
+      );
+    });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+  });
+});
+
+describe("rename", () => {
+  it.each(["grid", "list", "board"] as const)(
+    "Enter commits and sends PATCH { title } in the %s view",
+    async (view) => {
+      const fetchMock = stubFetch();
+      mountOne(view);
+      const input = startRename();
+      expect(input.value).toBe(TITLE);
+      type(input, "  New title  ");
+      key(input, "Enter");
+      await flush();
+      expect(container.textContent).toContain("New title");
+      expect(container.querySelector("input")).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/seed-r1", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title: "New title" }),
+      });
+    },
+  );
+
+  it("blur commits", async () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    const input = startRename();
+    type(input, "Blurred");
+    blur(input);
+    await flush();
+    expect(container.textContent).toContain("Blurred");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("Enter then a blur before re-render commits once", async () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    const input = startRename();
+    type(input, "Once");
+    act(() => {
+      input.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("Escape cancels and sends nothing", () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    const input = startRename();
+    type(input, "Discarded");
+    key(input, "Escape");
+    expect(container.textContent).toContain(TITLE);
+    expect(container.textContent).not.toContain("Discarded");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("an empty title sends nothing", () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    const input = startRename();
+    type(input, "   ");
+    key(input, "Enter");
+    expect(container.textContent).toContain(TITLE);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("an unchanged title sends nothing", () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    const input = startRename();
+    key(input, "Enter");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a failed PATCH reverts the title and toasts", async () => {
+    stubFetch(false);
+    mountOne();
+    const input = startRename();
+    type(input, "Doomed");
+    key(input, "Enter");
+    await flush();
+    expect(container.textContent).toContain(TITLE);
+    expect(container.textContent).not.toContain("Doomed");
+    expect(container.textContent).toContain("Could not rename Rewind");
+  });
+
+  it("a network error reverts too", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    mountOne();
+    const input = startRename();
+    type(input, "Doomed");
+    key(input, "Enter");
+    await flush();
+    expect(container.textContent).toContain(TITLE);
+    expect(container.textContent).toContain("Could not rename Rewind");
+  });
+});
+
+function deleteFirst() {
+  openRewindMenu();
+  click(menuItem("Delete Rewind"));
+}
+
+function toastButtons(label: "Undo" | "Close"): HTMLElement[] {
+  return label === "Undo"
+    ? qAll("button").filter((b) => b.textContent === "Undo")
+    : qAll('[aria-label="Close"]');
+}
+
+describe("delete with undo", () => {
+  it("hides the Rewind and toasts with Undo and ×, sending nothing yet", () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    deleteFirst();
+    expect(container.querySelector('a[href="/r/seed-r1"]')).toBeNull();
+    expect(container.textContent).toContain("Rewind deleted");
+    expect(toastButtons("Undo")).toHaveLength(1);
+    expect(toastButtons("Close")).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a toast left open for 60 s sends nothing and stays", () => {
+    vi.useFakeTimers();
+    const fetchMock = stubFetch();
+    mountOne();
+    deleteFirst();
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Rewind deleted");
+  });
+
+  it("× sends DELETE and closes the toast", async () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    deleteFirst();
+    click(toastButtons("Close")[0]);
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/seed-r1", {
+      method: "DELETE",
+    });
+    expect(container.textContent).not.toContain("Rewind deleted");
+    expect(container.querySelector('a[href="/r/seed-r1"]')).toBeNull();
+  });
+
+  it("Undo restores the Rewind and sends nothing, even on unmount", () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    deleteFirst();
+    click(toastButtons("Undo")[0]);
+    expect(q('a[href="/r/seed-r1"]')).toBeTruthy();
+    expect(container.textContent).not.toContain("Rewind deleted");
+    act(() => {
+      root.unmount();
+    });
+    root = createRoot(container);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("stacked deletes close and undo independently", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[
+          rewind({ id: "a", title: "First" }),
+          rewind({ id: "b", title: "Second" }),
+        ]}
+        folders={[]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    click(q('[aria-label="Actions for First"]'));
+    click(menuItem("Delete Rewind"));
+    click(q('[aria-label="Actions for Second"]'));
+    click(menuItem("Delete Rewind"));
+    expect(toastButtons("Close")).toHaveLength(2);
+
+    click(toastButtons("Undo")[1]);
+    expect(q('a[href="/r/b"]')).toBeTruthy();
+    expect(toastButtons("Close")).toHaveLength(1);
+
+    click(toastButtons("Close")[0]);
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "DELETE",
+    });
+  });
+
+  it("pagehide sends every pending DELETE with keepalive", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[
+          rewind({ id: "a", title: "First" }),
+          rewind({ id: "b", title: "Second" }),
+        ]}
+        folders={[]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    click(q('[aria-label="Actions for First"]'));
+    click(menuItem("Delete Rewind"));
+    click(q('[aria-label="Actions for Second"]'));
+    click(menuItem("Delete Rewind"));
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "DELETE",
+      keepalive: true,
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/b", {
+      method: "DELETE",
+      keepalive: true,
+    });
+
+    // Already sent: a later × sends nothing more.
+    click(toastButtons("Close")[0]);
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("unmounting (a client navigation) sends pending DELETEs with keepalive", async () => {
+    const fetchMock = stubFetch();
+    mountOne();
+    deleteFirst();
+    act(() => {
+      root.unmount();
+    });
+    root = createRoot(container);
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/seed-r1", {
+      method: "DELETE",
+      keepalive: true,
+    });
+  });
+
+  it("a failed DELETE restores the Rewind and toasts", async () => {
+    stubFetch(false);
+    mountOne();
+    deleteFirst();
+    click(toastButtons("Close")[0]);
+    await flush();
+    expect(q('a[href="/r/seed-r1"]')).toBeTruthy();
+    expect(container.textContent).toContain("Could not delete Rewind");
+  });
+
+  it("a failed keepalive flush restores the Rewind and toasts", async () => {
+    stubFetch(false);
+    mountOne();
+    deleteFirst();
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    await flush();
+    expect(q('a[href="/r/seed-r1"]')).toBeTruthy();
+    expect(container.textContent).toContain("Could not delete Rewind");
   });
 });

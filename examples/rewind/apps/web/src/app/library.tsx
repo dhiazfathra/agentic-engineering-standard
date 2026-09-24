@@ -2,14 +2,24 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import type { RewindStatus } from "@rewind/schema";
 import { ToastStack, useToast } from "@/components/toast";
 import { copyRewindLink } from "@/lib/copy-link";
+import { usePendingDeletes } from "@/lib/use-pending-deletes";
 import {
   boardColumns,
   filterByFolder,
   folderCounts,
+  libraryReducer,
   type LibraryView,
 } from "@/lib/library";
 import type { FolderListItem, RewindListItem } from "@/lib/rewinds";
@@ -64,9 +74,147 @@ function libraryUrl(view: LibraryView, folderId: string | undefined): string {
   return qs ? `/?${qs}` : "/";
 }
 
-export function Library({ rewinds, folders, view, folderId }: Props) {
+type MenuItem = { label: string; danger?: boolean; onSelect: () => void };
+type MenuState = {
+  x: number;
+  y: number;
+  label: string;
+  items: MenuItem[];
+  trigger: HTMLElement | null;
+};
+type Editing = { kind: "rewind" | "folder"; id: string } | null;
+
+export function Library(props: Props) {
+  const { view, folderId } = props;
   const router = useRouter();
-  const { toasts, showToast, undo, close } = useToast();
+  const { toasts, showToast, showActionToast, undo, close } = useToast();
+  const [{ rewinds, folders }, dispatch] = useReducer(libraryReducer, {
+    rewinds: props.rewinds,
+    folders: props.folders,
+  });
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [editing, setEditing] = useState<Editing>(null);
+
+  const showError = useCallback(
+    (text: string) => showToast(text, "error"),
+    [showToast],
+  );
+  const pending = usePendingDeletes(showError);
+
+  /** Sends one optimistic write; on failure runs `revert` and toasts. */
+  const write = async (
+    url: string,
+    method: string,
+    body: unknown,
+    revert: () => void,
+    failText: string,
+  ): Promise<Response | undefined> => {
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`${method} ${res.status}`);
+      return res;
+    } catch {
+      revert();
+      showError(failText);
+    }
+  };
+
+  /** Hides happen before this; the toast's `×` sends, Undo restores. */
+  const deleteLater = (
+    text: string,
+    url: string,
+    restore: () => void,
+    failText: string,
+  ) => {
+    const key = pending.add({ url, restore, failText });
+    showActionToast(text, {
+      onUndo: () => pending.undo(key),
+      onClose: () => pending.send(key),
+    });
+  };
+
+  const openMenu = (
+    e: ReactMouseEvent<HTMLElement>,
+    label: string,
+    items: MenuItem[],
+  ) => {
+    e.preventDefault();
+    const fromButton = e.type === "click";
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenu({
+      x: fromButton ? rect.left : e.clientX,
+      y: fromButton ? rect.bottom : e.clientY,
+      label,
+      items,
+      trigger: fromButton ? e.currentTarget : null,
+    });
+  };
+
+  const renameRewind = (r: RewindListItem, title: string) => {
+    setEditing(null);
+    if (title === "" || title === r.title) return;
+    dispatch({ type: "rename", id: r.id, title });
+    void write(
+      `/api/rewinds/${r.id}`,
+      "PATCH",
+      { title },
+      () => dispatch({ type: "rename", id: r.id, title: r.title }),
+      "Could not rename Rewind",
+    );
+  };
+
+  const deleteRewind = (r: RewindListItem) => {
+    dispatch({ type: "removeRewind", id: r.id });
+    deleteLater(
+      "Rewind deleted",
+      `/api/rewinds/${r.id}`,
+      () => dispatch({ type: "restoreRewind", rewind: r }),
+      "Could not delete Rewind",
+    );
+  };
+
+  const rewindMenu = (e: ReactMouseEvent<HTMLElement>, r: RewindListItem) =>
+    openMenu(e, `Actions for ${r.title}`, [
+      {
+        label: "Rename",
+        onSelect: () => setEditing({ kind: "rewind", id: r.id }),
+      },
+      { label: "Delete Rewind", danger: true, onSelect: () => deleteRewind(r) },
+    ]);
+
+  const isEditing = (r: RewindListItem) =>
+    editing?.kind === "rewind" && editing.id === r.id;
+
+  /** The title link, or its inline rename input while editing. */
+  const rewindTitle = (r: RewindListItem, className: string) =>
+    isEditing(r) ? (
+      <InlineRename
+        label="Rewind title"
+        value={r.title}
+        onDone={(title) => renameRewind(r, title)}
+        onCancel={() => setEditing(null)}
+      />
+    ) : (
+      <Link href={`/r/${r.id}`} className={className}>
+        {r.title}
+      </Link>
+    );
+
+  const moreButton = (r: RewindListItem) => (
+    <button
+      type="button"
+      className={styles.moreButton}
+      aria-label={`Actions for ${r.title}`}
+      aria-haspopup="menu"
+      onClick={(e) => rewindMenu(e, r)}
+    >
+      ⋯
+    </button>
+  );
 
   const counts = useMemo(() => folderCounts(rewinds), [rewinds]);
   const activeFolder =
@@ -162,28 +310,33 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
           {view === "grid" && (
             <div className={styles.grid}>
               {shownRewinds.map((r) => (
-                <div key={r.id} className={styles.card}>
+                <div
+                  key={r.id}
+                  className={styles.card}
+                  onContextMenu={(e) => rewindMenu(e, r)}
+                >
                   <Link href={`/r/${r.id}`} className={styles.cardLink}>
                     <div className={styles.thumb}>
                       <span className={styles.duration}>{duration(r)}</span>
                     </div>
-                    <div className={styles.cardTitle}>{r.title}</div>
-                    <div className={styles.cardMeta}>
-                      <Avatar name={r.reporterName} />
-                      <span className={styles.metaText}>
-                        {r.url} ·{" "}
-                        <time
-                          dateTime={r.createdAt.toISOString()}
-                          suppressHydrationWarning
-                        >
-                          {timeAgo(r.createdAt)}
-                        </time>
-                      </span>
-                      <span className={styles.status}>
-                        {STATUS_LABEL[r.status as RewindStatus]}
-                      </span>
-                    </div>
                   </Link>
+                  {rewindTitle(r, styles.cardTitle)}
+                  <div className={styles.cardMeta}>
+                    <Avatar name={r.reporterName} />
+                    <span className={styles.metaText}>
+                      {r.url} ·{" "}
+                      <time
+                        dateTime={r.createdAt.toISOString()}
+                        suppressHydrationWarning
+                      >
+                        {timeAgo(r.createdAt)}
+                      </time>
+                    </span>
+                    <span className={styles.status}>
+                      {STATUS_LABEL[r.status as RewindStatus]}
+                    </span>
+                    {moreButton(r)}
+                  </div>
                   {copyButton(r.id)}
                 </div>
               ))}
@@ -201,14 +354,15 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
                 <span role="columnheader" />
               </div>
               {shownRewinds.map((r) => (
-                <div key={r.id} className={styles.listRow} role="row">
-                  <Link
-                    href={`/r/${r.id}`}
-                    className={styles.listTitle}
-                    role="cell"
-                  >
-                    {r.title}
-                  </Link>
+                <div
+                  key={r.id}
+                  className={styles.listRow}
+                  role="row"
+                  onContextMenu={(e) => rewindMenu(e, r)}
+                >
+                  <span className={styles.listCell} role="cell">
+                    {rewindTitle(r, styles.listTitle)}
+                  </span>
                   <span className={styles.listMuted} role="cell">
                     {r.url}
                   </span>
@@ -224,7 +378,10 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
                       {STATUS_LABEL[r.status as RewindStatus]}
                     </span>
                   </span>
-                  <span role="cell">{copyButton(r.id)}</span>
+                  <span className={styles.listActions} role="cell">
+                    {copyButton(r.id)}
+                    {moreButton(r)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -249,10 +406,12 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
                     </span>
                   </div>
                   {c.rewinds.map((r) => (
-                    <div key={r.id} className={styles.boardCard}>
-                      <Link href={`/r/${r.id}`} className={styles.boardTitle}>
-                        {r.title}
-                      </Link>
+                    <div
+                      key={r.id}
+                      className={styles.boardCard}
+                      onContextMenu={(e) => rewindMenu(e, r)}
+                    >
+                      {rewindTitle(r, styles.boardTitle)}
                       <div className={styles.boardUrl}>{r.url}</div>
                       <div className={styles.boardMeta}>
                         <Avatar name={r.reporterName} />
@@ -265,6 +424,7 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
                           </span>
                         )}
                         {copyButton(r.id)}
+                        {moreButton(r)}
                       </div>
                     </div>
                   ))}
@@ -278,7 +438,102 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
         </div>
       </div>
 
+      {menu && (
+        <ContextMenu
+          {...menu}
+          onClose={() => {
+            menu.trigger?.focus();
+            setMenu(null);
+          }}
+        />
+      )}
       <ToastStack toasts={toasts} onUndo={undo} onClose={close} />
     </div>
+  );
+}
+
+type ContextMenuProps = {
+  x: number;
+  y: number;
+  label: string;
+  items: MenuItem[];
+  onClose: () => void;
+};
+
+/** A `role="menu"` popup; Escape or a click outside closes it. */
+function ContextMenu({ x, y, label, items, onClose }: ContextMenuProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector("button")?.focus();
+  }, []);
+  return (
+    <>
+      <div
+        className={styles.menuBackdrop}
+        onClick={onClose}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          onClose();
+        }}
+      />
+      <div
+        ref={ref}
+        role="menu"
+        aria-label={label}
+        className={styles.menu}
+        style={{ left: x, top: y }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+        }}
+      >
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            className={`${styles.menuItem} ${item.danger ? styles.menuDanger : ""}`}
+            onClick={() => {
+              onClose();
+              item.onSelect();
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+type InlineRenameProps = {
+  label: string;
+  value: string;
+  onDone: (value: string) => void;
+  onCancel: () => void;
+};
+
+/** Enter and blur commit the trimmed value; Escape cancels. */
+function InlineRename({ label, value, onDone, onCancel }: InlineRenameProps) {
+  const [draft, setDraft] = useState(value);
+  const finished = useRef(false);
+  const finish = (commit: boolean) => {
+    if (finished.current) return;
+    finished.current = true;
+    if (commit) onDone(draft.trim());
+    else onCancel();
+  };
+  return (
+    <input
+      autoFocus
+      aria-label={label}
+      className={styles.renameInput}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") finish(true);
+        if (e.key === "Escape") finish(false);
+      }}
+      onBlur={() => finish(true)}
+    />
   );
 }

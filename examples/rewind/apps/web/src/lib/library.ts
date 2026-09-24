@@ -173,7 +173,13 @@ export function libraryReducer(
         rewinds: state.rewinds.filter((r) => r.id !== action.id),
       };
     case "restoreRewind":
-      return { ...state, rewinds: [...state.rewinds, action.rewind] };
+      // Back in its newest-first place, not at the end.
+      return {
+        ...state,
+        rewinds: [...state.rewinds, action.rewind].sort(
+          (x, y) => y.createdAt.getTime() - x.createdAt.getTime(),
+        ),
+      };
     case "addFolder":
       return { ...state, folders: [...state.folders, action.folder] };
     case "renameFolder":

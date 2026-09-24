@@ -72,16 +72,16 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ## T5: Rename and delete with undo
 
-- [ ] Context menu on right-click and on a `⋯` button: Rename, Delete
+- [x] Context menu on right-click and on a `⋯` button: Rename, Delete
       (Move to and Set status land in T7).
-- [ ] Inline rename: Enter and blur commit, Escape cancels, empty or
+- [x] Inline rename: Enter and blur commit, Escape cancels, empty or
       unchanged sends nothing; failed `PATCH` reverts and toasts.
-- [ ] Delete: hide, toast "Rewind deleted" with Undo and `×`, no timer;
+- [x] Delete: hide, toast "Rewind deleted" with Undo and `×`, no timer;
       `×` sends `DELETE`; Undo restores and sends nothing; stacked
       deletes close independently; `pagehide` and unmount send every
       pending `DELETE` with `keepalive`;
       failed `DELETE` restores and toasts.
-- [ ] DOM tests for every branch above, including a toast left open
+- [x] DOM tests for every branch above, including a toast left open
       with fake timers advanced 60 s sending nothing.
 
 **Dependencies:** T3 · **Scope:** M

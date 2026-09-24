@@ -258,6 +258,17 @@ describe("libraryReducer", () => {
     expect(next.rewinds).toEqual([rewind]);
   });
 
+  it("restores a rewind into its newest-first place", () => {
+    const older = { ...rewind, id: "old", createdAt: new Date(1000) };
+    const newer = { ...rewind, id: "new", createdAt: new Date(3000) };
+    const middle = { ...rewind, id: "mid", createdAt: new Date(2000) };
+    const next = libraryReducer(
+      { rewinds: [newer, older], folders: [] },
+      { type: "restoreRewind", rewind: middle },
+    );
+    expect(next.rewinds.map((r) => r.id)).toEqual(["new", "mid", "old"]);
+  });
+
   it("adds a folder", () => {
     const newFolder = {
       id: "f2",
