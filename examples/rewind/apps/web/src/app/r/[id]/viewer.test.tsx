@@ -906,16 +906,14 @@ describe("status", () => {
     expect(container.textContent).toContain("Could not update status");
   });
 
-  it("ignores a stale failure after a newer status change", async () => {
-    let failFirst!: () => void;
-    vi.spyOn(globalThis, "fetch")
-      .mockImplementationOnce(
-        () =>
-          new Promise<Response>((resolve) => {
-            failFirst = () => resolve(new Response(null, { status: 500 }));
-          }),
-      )
-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+  it("disables the select while a status change is in flight", async () => {
+    let finish!: () => void;
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = () => resolve(new Response(null, { status: 200 }));
+        }),
+    );
     mount(
       <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
     );
@@ -925,49 +923,14 @@ describe("status", () => {
       select.dispatchEvent(new Event("change", { bubbles: true }));
       await Promise.resolve();
     });
+    expect(select.disabled).toBe(true);
     await act(async () => {
-      select.value = "progress";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
+      finish();
       await Promise.resolve();
       await Promise.resolve();
     });
-    await act(async () => {
-      failFirst();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    expect(select.value).toBe("progress");
-    expect(container.textContent).not.toContain("Could not update status");
-  });
-
-  it("rolls back to the last confirmed status when every change fails", async () => {
-    let failFirst!: () => void;
-    vi.spyOn(globalThis, "fetch")
-      .mockImplementationOnce(
-        () =>
-          new Promise<Response>((resolve) => {
-            failFirst = () => resolve(new Response(null, { status: 500 }));
-          }),
-      )
-      .mockResolvedValueOnce(new Response(null, { status: 500 }));
-    mount(
-      <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
-    );
-    const select = q('select[aria-label="Status"]') as HTMLSelectElement;
-    await act(async () => {
-      select.value = "triage";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-      await Promise.resolve();
-    });
-    await act(async () => {
-      failFirst();
-      select.value = "progress";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    expect(select.value).toBe("new");
-    expect(container.textContent).toContain("Could not update status");
+    expect(select.disabled).toBe(false);
+    expect(select.value).toBe("triage");
   });
 });
 

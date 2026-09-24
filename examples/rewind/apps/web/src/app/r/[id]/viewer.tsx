@@ -72,11 +72,10 @@ export function Viewer({ rewind, mediaUrl }: Props) {
   const [authorName, setAuthorName] = useState(rememberedAuthor);
   const [toast, setToast] = useState<Toast | null>(null);
   const [posting, setPosting] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const mediaRef = useRef<HTMLVideoElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const statusRequest = useRef(0);
-  const confirmedStatus = useRef(rewind.status as RewindStatus);
 
   const duration = rewind.durationSeconds ?? 0;
   const isVideo = rewind.kind === "video";
@@ -203,8 +202,9 @@ export function Viewer({ rewind, mediaUrl }: Props) {
 
   const onStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const next = e.target.value as RewindStatus;
-    const request = ++statusRequest.current;
+    const previous = status;
     setStatus(next);
+    setUpdatingStatus(true);
     try {
       const res = await fetch(`/api/rewinds/${rewind.id}`, {
         method: "PATCH",
@@ -212,11 +212,11 @@ export function Viewer({ rewind, mediaUrl }: Props) {
         body: JSON.stringify({ status: next }),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
-      confirmedStatus.current = next;
     } catch {
-      if (request !== statusRequest.current) return;
-      setStatus(confirmedStatus.current);
+      setStatus(previous);
       showToast({ text: "Could not update status", tone: "error" });
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -256,6 +256,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
           className={styles.status}
           value={status}
           onChange={onStatusChange}
+          disabled={updatingStatus}
           aria-label="Status"
         >
           {(Object.keys(STATUS_LABEL) as RewindStatus[]).map((key) => (
