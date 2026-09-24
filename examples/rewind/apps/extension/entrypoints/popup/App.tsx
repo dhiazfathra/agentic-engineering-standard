@@ -21,6 +21,18 @@ function hasTabCapture(): boolean {
   return Boolean((browser as unknown as { tabCapture?: unknown }).tabCapture);
 }
 
+/** Firefox MV3 gates `<all_urls>` behind an explicit user grant; Chrome grants it upfront. */
+function hostPermissions() {
+  return (
+    browser as unknown as {
+      permissions?: {
+        contains(p: { origins: string[] }): Promise<boolean>;
+        request(p: { origins: string[] }): Promise<boolean>;
+      };
+    }
+  ).permissions;
+}
+
 function isHttpUrl(url: string | undefined): boolean {
   return url !== undefined && /^https?:\/\//.test(url);
 }
@@ -149,6 +161,7 @@ export default function App() {
   const [replayError, setReplayError] = useState<string | null>(null);
   const [appUrlDraft, setAppUrlDraft] = useState("");
   const [appUrlError, setAppUrlError] = useState<string | null>(null);
+  const [hasHostAccess, setHasHostAccess] = useState(true);
 
   useEffect(() => {
     void settingsItem.getValue().then((s) => {
@@ -181,6 +194,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    void hostPermissions()
+      ?.contains({ origins: ["<all_urls>"] })
+      .then(setHasHostAccess);
+  }, []);
+
+  async function handleGrantAccess() {
+    const granted = await hostPermissions()?.request({
+      origins: ["<all_urls>"],
+    });
+    setHasHostAccess(Boolean(granted));
+  }
+
+  useEffect(() => {
     if (!recOpen) return;
     void navigator.mediaDevices.enumerateDevices().then((devices) => {
       const inputs = devices.filter((d) => d.kind === "audioinput");
@@ -201,7 +227,7 @@ export default function App() {
     );
   }
 
-  const canCapture = isHttpUrl(tab.url);
+  const canCapture = isHttpUrl(tab.url) && hasHostAccess;
   const tabCaptureAvailable = hasTabCapture();
   const effectiveMode: RecordMode = tabCaptureAvailable
     ? settings.recordMode
@@ -336,7 +362,19 @@ export default function App() {
 
       {view === "home" && (
         <div className={styles.body}>
-          {!canCapture && (
+          {!hasHostAccess && (
+            <div className={`${styles.block} ${styles.notice}`}>
+              <span>Rewind needs access to web pages to capture them</span>
+              <button
+                type="button"
+                className={styles.noticeButton}
+                onClick={() => void handleGrantAccess()}
+              >
+                Grant access
+              </button>
+            </div>
+          )}
+          {!canCapture && hasHostAccess && (
             <div className={styles.hint}>Open a web page to capture it</div>
           )}
           <div className={styles.block}>

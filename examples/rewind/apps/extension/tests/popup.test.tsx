@@ -85,6 +85,19 @@ function stubTabCapture(available: boolean) {
   }
 }
 
+function stubPermissions(overrides: {
+  contains?: () => Promise<boolean>;
+  request?: () => Promise<boolean>;
+}) {
+  Object.defineProperty(browser, "permissions", {
+    value: {
+      contains: vi.fn(overrides.contains ?? (() => Promise.resolve(true))),
+      request: vi.fn(overrides.request ?? (() => Promise.resolve(true))),
+    },
+    configurable: true,
+  });
+}
+
 function stubMediaDevices(
   devices: { deviceId: string; kind: string; label: string }[],
 ) {
@@ -119,6 +132,7 @@ beforeEach(async () => {
   vi.spyOn(window, "close").mockImplementation(() => undefined);
   stubTabCapture(true);
   stubMediaDevices([]);
+  stubPermissions({});
 });
 
 afterEach(() => {
@@ -204,6 +218,56 @@ describe("home", () => {
     for (const btn of mainActions) {
       expect((btn as HTMLButtonElement).disabled).toBe(true);
     }
+  });
+
+  it("shows no host access notice once permission is granted", async () => {
+    mount();
+    await flush();
+    expect(container.textContent).not.toContain(
+      "Rewind needs access to web pages to capture them",
+    );
+  });
+
+  it("shows a host access notice and disables capture until granted", async () => {
+    stubPermissions({ contains: () => Promise.resolve(false) });
+    mount();
+    await flush();
+    expect(container.textContent).toContain(
+      "Rewind needs access to web pages to capture them",
+    );
+    const mainActions = qAll("[class*='mainAction']");
+    expect(mainActions.length).toBeGreaterThan(0);
+    for (const btn of mainActions) {
+      expect((btn as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
+  it("hides the notice after the grant request succeeds", async () => {
+    stubPermissions({
+      contains: () => Promise.resolve(false),
+      request: () => Promise.resolve(true),
+    });
+    mount();
+    await flush();
+    click(q("[class*='noticeButton']"));
+    await flush();
+    expect(container.textContent).not.toContain(
+      "Rewind needs access to web pages to capture them",
+    );
+  });
+
+  it("keeps the notice when the grant request is denied", async () => {
+    stubPermissions({
+      contains: () => Promise.resolve(false),
+      request: () => Promise.resolve(false),
+    });
+    mount();
+    await flush();
+    click(q("[class*='noticeButton']"));
+    await flush();
+    expect(container.textContent).toContain(
+      "Rewind needs access to web pages to capture them",
+    );
   });
 
   it("sends a screenshot message and closes", async () => {
