@@ -112,7 +112,9 @@ window; a replay's span runs from its first to its last snapshot.
 
 **Screenshot.** The background waits the delay, then
 `tabs.captureVisibleTab` (PNG) of the target tab's window, saves a draft,
-and opens the editor. The editor exports the image with its boxes and
+and opens the editor. If the target tab is no longer the visible tab in
+its window (the user switched tabs during the delay), the capture fails
+instead of saving another tab's pixels. The editor exports the image with its boxes and
 labels drawn in as `image/png`.
 
 **Recording.** The popup opens the recorder window for the target tab.
@@ -131,7 +133,9 @@ labels drawn in as `image/png`.
 - `MediaRecorder` writes `video/webm`. Pause and resume map to the
   recorder's `pause()` and `resume()`. Stop, the tab closing, or the
   browser's "Stop sharing" ends the capture: the recorder saves a draft
-  with the events for its spans and opens the editor.
+  with the events for its spans and opens the editor. Stop before the
+  countdown ends discards instead, since nothing was recorded. Closing
+  the recorder window releases the tab's event hold.
 
 **Instant replay.** Off by default. While on, the background takes a
 JPEG `captureVisibleTab` of the focused window's active `http(s)` tab
@@ -159,7 +163,9 @@ settings:
    header. The URL signs `content-type`, so any other value fails.
 3. `POST /api/rewinds` with a body parsed by `createRewind` from
    `@rewind/schema` before it is sent: `title` (default `Screenshot of
-host/path` or `Recording of host/path`), the page `url`,
+host/path` or `Recording of host/path`, cut to the schema's title
+   limit), the page `url` (without its hash, cut to the schema's URL
+   limit),
    `reporterName`, `kind`, `mediaKey`, `durationSeconds` (videos only),
    and the events.
 
