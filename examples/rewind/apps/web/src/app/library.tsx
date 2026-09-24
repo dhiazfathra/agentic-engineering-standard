@@ -114,6 +114,10 @@ export function Library(props: Props) {
     rewinds: props.rewinds,
     folders: props.folders,
   });
+  // Mirrors the reducer state so queueWrite's async flush can read the live
+  // rendered value instead of the value captured when the edit was queued.
+  const stateRef = useRef({ rewinds, folders });
+  stateRef.current = { rewinds, folders };
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
   // Reads `rw-dark` off `<body>` through useSyncExternalStore instead of
@@ -158,13 +162,13 @@ export function Library(props: Props) {
   const saves = useRef(new Map<string, SaveEntry>());
   const queueWrite = <T,>(
     key: string,
-    previous: T,
+    getCurrent: () => T,
     value: T,
     send: (value: T) => Promise<Response | undefined>,
     apply: (value: T) => void,
   ) => {
     const entry = saves.current.get(key) ?? {
-      confirmed: previous,
+      confirmed: getCurrent(),
       sending: false,
     };
     saves.current.set(key, entry);
@@ -174,7 +178,7 @@ export function Library(props: Props) {
     }
     // Idle, so the rendered value is what the server last accepted; other
     // paths (e.g. deleting a folder) change fields without going through here.
-    entry.confirmed = previous;
+    entry.confirmed = getCurrent();
     entry.sending = true;
     void send(value).then((res) => {
       if (res) entry.confirmed = value;
@@ -183,7 +187,7 @@ export function Library(props: Props) {
       const next = entry.queued;
       if (next !== undefined) {
         entry.queued = undefined;
-        queueWrite(key, entry.confirmed as T, next as T, send, apply);
+        queueWrite(key, getCurrent, next as T, send, apply);
       }
     });
   };
@@ -247,7 +251,8 @@ export function Library(props: Props) {
     dispatch({ type: "rename", id: r.id, title });
     queueWrite(
       `${r.id}:title`,
-      r.title,
+      () =>
+        stateRef.current.rewinds.find((x) => x.id === r.id)?.title ?? r.title,
       title,
       (title) =>
         write(
@@ -292,7 +297,7 @@ export function Library(props: Props) {
     dispatch({ type: "renameFolder", id: f.id, name });
     queueWrite(
       `${f.id}:name`,
-      f.name,
+      () => stateRef.current.folders.find((x) => x.id === f.id)?.name ?? f.name,
       name,
       (name) =>
         write(
@@ -431,7 +436,8 @@ export function Library(props: Props) {
     showToast(`Moved to ${STATUS_LABEL[status]}`);
     queueWrite(
       `${r.id}:status`,
-      r.status,
+      () =>
+        stateRef.current.rewinds.find((x) => x.id === r.id)?.status ?? r.status,
       status,
       (status) =>
         write(
@@ -450,7 +456,10 @@ export function Library(props: Props) {
     dispatch({ type: "setFolder", id: r.id, folderId: folder });
     queueWrite(
       `${r.id}:folderId`,
-      r.folderId,
+      () => {
+        const live = stateRef.current.rewinds.find((x) => x.id === r.id);
+        return live ? live.folderId : r.folderId;
+      },
       folder,
       (folderId) =>
         write(
