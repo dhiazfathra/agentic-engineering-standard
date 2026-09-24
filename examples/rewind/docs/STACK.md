@@ -28,10 +28,10 @@ Seed:       bun run db:seed             # design's sample rewinds; idempotent (i
 Dev:        bun run dev                 # next dev on :3000 and wxt dev, in parallel
 Dev (FF):   bun run --filter extension dev:firefox
 Test:       bun run test                # vitest run --coverage in every package
-E2E:        bun run e2e                 # Playwright: web against next start, extension loads unpacked
+E2E:        bun run e2e                 # Playwright: web against next start; extension unpacked against the web app on :3200
 Lint:       bun run lint                # eslint . in every package
 Typecheck:  bun run typecheck           # tsc --noEmit in every package
-Build:      bun run build               # next build; wxt build (chrome-mv3, firefox-mv2)
+Build:      bun run build               # next build; wxt build (chrome-mv3, firefox-mv3)
 ```
 
 ## Project structure
@@ -52,14 +52,18 @@ examples/rewind/
       src/styles/          tokens.css (copied from the design), fonts.ts (next/font/google)
       drizzle/             generated SQL migrations
       e2e/                 Playwright specs (health, design tokens, rewinds upload flow, viewer); the web server seeds its fresh e2e.db
-    extension/             WXT, Chrome and Firefox from one codebase
-      entrypoints/         background.ts, popup/
+    extension/             WXT, Manifest V3 for Chrome and Firefox from one codebase
+      entrypoints/         background.ts, capture-main.content.ts (MAIN world) + capture.content.ts (ISOLATED), popup/, recorder/, editor/
+      lib/                 pure helpers (events, timeline, buffer, settings, drafts, upload) and media.ts (browser-only capture and Mediabunny wrappers)
+      lib/background/      the background's handlers: event buffer, screenshot, recorder window, instant replay
+      styles/base.css      imports apps/web's tokens.css and the bundled Inter and Poppins fonts
       tests/               Vitest specs (WXT reads entrypoints/ as entrypoints, so tests live here)
-      e2e/                 Playwright: loads the Chrome build unpacked
+      e2e/                 Playwright: the Chrome build unpacked, filing to the web app on :3200 (own ext-e2e.db); Firefox build via web-ext lint
   packages/
     schema/                shared zod request/response contracts for the rewinds API
   docs/
     STACK.md               this file
+    extension-manual-check.md  browser-only checks the e2e cannot run
     design/                Rewind.dc.html, a reference copy of the design
 ```
 
@@ -81,6 +85,7 @@ invalid variable.
 A real `S3_ENDPOINT` env var overrides the `.env.example` default for the
 web e2e suite, so MinIO can run on remapped ports when 9000 is already
 taken locally (`S3_ENDPOINT=http://localhost:9100 bun run --filter web e2e`).
+The extension e2e honors it the same way.
 
 ## Deploy
 

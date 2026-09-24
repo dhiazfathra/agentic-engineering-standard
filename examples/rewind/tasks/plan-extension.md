@@ -103,45 +103,45 @@ T1 setup (deps, manifest, styles, test config)
 
 ### Phase 1: Foundation
 
-- [ ] T1: setup
-- [ ] T2: `lib/` pure modules
+- [x] T1: setup
+- [x] T2: `lib/` pure modules
 
 ### Checkpoint A
 
-- [ ] `bun run --filter extension test`, `lint`, `typecheck` exit 0 at 100%
-- [ ] Commit
+- [x] `bun run --filter extension test`, `lint`, `typecheck` exit 0 at 100%
+- [x] Commit
 
 ### Phase 2: Capture
 
-- [ ] T3: content scripts
-- [ ] T4: background
+- [x] T3: content scripts
+- [x] T4: background
 
 ### Checkpoint B
 
-- [ ] Tests at 100%; `bun run --filter extension build` produces both targets
-- [ ] Commit
+- [x] Tests at 100%; `bun run --filter extension build` produces both targets
+- [x] Commit
 
 ### Phase 3: Pages
 
-- [ ] T5: popup
-- [ ] T6: `lib/media.ts` and the recorder
-- [ ] T7: editor
+- [x] T5: popup
+- [x] T6: `lib/media.ts` and the recorder
+- [x] T7: editor
 
 ### Checkpoint C
 
-- [ ] Tests at 100%, lint and typecheck clean, build clean
-- [ ] Commit
+- [x] Tests at 100%, lint and typecheck clean, build clean
+- [x] Commit
 
 ### Phase 4: Proof
 
-- [ ] T8: e2e
-- [ ] T9: docs, manual check, learning
+- [x] T8: e2e
+- [x] T9: docs, manual check, learning
 
 ### Checkpoint: Complete
 
-- [ ] The five success criteria in `SPEC-extension.md` hold, with evidence
-- [ ] `/security-review`, `/performance`, `/documentation-and-adrs`
-- [ ] The learn skill updates `learning/`
+- [x] The five success criteria in `SPEC-extension.md` hold, with evidence
+- [x] `/security-review`, `/performance`, `/documentation-and-adrs`
+- [x] The learn skill updates `learning/`
 
 ## Risks and mitigations
 
@@ -153,3 +153,37 @@ T1 setup (deps, manifest, styles, test config)
 | WebCodecs or Mediabunny misbehave in headless Chromium                  | Med    | The replay e2e proves it; if VP9 fails, fall back to VP8 in `media.ts`.                                             |
 | Firefox MV3 host permissions are optional and may not be granted        | Low    | The popup checks `permissions.contains` and asks with `permissions.request` from its click; manual check covers it. |
 | A cross-app CSS import breaks WXT's dev server                          | Low    | Vite allows files inside the workspace root; the build and the popup e2e prove the tokens load.                     |
+
+## Finishing notes
+
+- `/security-review` (by hand on the changed code):
+  - Fixed: a page can post the MAIN world's `{ source: "rewind", event }`
+    message itself. A malformed one (non-string text, unknown kind,
+    far-future time) broke capture or the upload for that tab, so the
+    background now drops any event that fails its schema. A well-formed
+    forged event is accepted: the page could log the same text.
+  - Recorded, not fixed: captured network events keep the query string,
+    which can hold tokens. They stay in the tab's local buffer and leave
+    the browser only when the user files a Rewind, which then shows them
+    to anyone with the link (v1 has no auth). Input values are never
+    captured.
+  - Uploads go only to the configured web app and the presigned URL it
+    returns; the web app URL must be `http(s)`. Event text renders as
+    React text in the extension and the viewer, never as HTML.
+- `/performance`:
+  - Every page pays for the console, fetch and XHR wrappers and one
+    `runtime.sendMessage` per event. The background writes the buffer to
+    `storage.session` at most once a second.
+  - Instant replay takes a JPEG `captureVisibleTab` every second while
+    it is on, which is why it is off by default. Snapshots older than 2
+    minutes are pruned on each tick.
+  - Not fixed, recorded: `encodeFrames` decodes all snapshots (up to 120)
+    into `ImageBitmap`s at once before encoding. Fine at 2 minutes of
+    viewport-sized JPEGs; stream them if the window grows.
+- `/documentation-and-adrs`: `docs/STACK.md` lists the extension's
+  structure, the Firefox MV3 output and the e2e's web server;
+  `docs/extension-manual-check.md` lists the checks the e2e cannot run.
+  No ADR: the extension files Rewinds through the unchanged `rewinds-api`
+  contract (ADR-0001), and its own choices (recorder window, IndexedDB
+  drafts, Mediabunny) are recorded in `SPEC-extension.md` and are cheap
+  to reverse.

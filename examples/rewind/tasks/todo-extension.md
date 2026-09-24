@@ -9,26 +9,26 @@ unless a task says otherwise. Prefix commands that run Node with
 
 ## T1: Setup
 
-- [ ] Dependencies (`bun add` in `apps/extension`, pinned exact):
+- [x] Dependencies (`bun add` in `apps/extension`, pinned exact):
       `@rewind/schema` (`workspace:*`), `mediabunny`,
       `@fontsource-variable/inter`, `@fontsource/poppins`; dev:
       `happy-dom` (same version as `apps/web`), `fake-indexeddb`.
-- [ ] `wxt.config.ts`: manifest as a function of the browser: name
+- [x] `wxt.config.ts`: manifest as a function of the browser: name
       Rewind, permissions `storage tabs alarms unlimitedStorage`, plus
       `tabCapture` on Chrome; `host_permissions: ["<all_urls>"]`;
       `commands` `screenshot` (`Alt+Shift+S`) and `save-replay`
       (`Alt+Shift+R`); Firefox `browser_specific_settings.gecko.id`
       `rewind@rewind.dev`.
-- [ ] `package.json` `build`: `wxt build && wxt build -b firefox --mv3`;
+- [x] `package.json` `build`: `wxt build && wxt build -b firefox --mv3`;
       `dev:firefox`: `wxt -b firefox --mv3`. The popup e2e's Firefox
       check reads `.output/firefox-mv3/manifest.json` and asserts
       `manifest_version` 3.
-- [ ] `styles/base.css`: `@import` the web app's tokens
+- [x] `styles/base.css`: `@import` the web app's tokens
       (`../../web/src/styles/tokens.css`), the two font packages, and
       `:root { --font-inter: "Inter Variable"; --font-poppins: "Poppins"; }`.
       `lib/theme.ts`: `applyTheme(theme)` toggles `body.rw-dark`
       (`system` follows `prefers-color-scheme`).
-- [ ] `vitest.config.mts`: coverage over `entrypoints/**` and `lib/**`,
+- [x] `vitest.config.mts`: coverage over `entrypoints/**` and `lib/**`,
       excluding each page's `main.tsx` bootstrap; `setupFiles` loads
       `fake-indexeddb/auto`.
 
@@ -36,49 +36,49 @@ unless a task says otherwise. Prefix commands that run Node with
 
 ## T2: `lib/` pure modules
 
-- [ ] `lib/messages.ts`: the types in `plan-extension.md` and a typed
+- [x] `lib/messages.ts`: the types in `plan-extension.md` and a typed
       `send(message)` over `browser.runtime.sendMessage`.
-- [ ] `lib/timeline.ts`: `Span`, `mediaTime(at, spans)` (spec's code
+- [x] `lib/timeline.ts`: `Span`, `mediaTime(at, spans)` (spec's code
       style), `spanSeconds(spans)`, `toRewindEvents(captured, spans)`
       (drops events outside spans, sorts by `t`, cuts text to 10,000,
       keeps at most 10,000), `trimEvents(events, start, end)` (keeps
       `start <= t <= end`, shifts by `-start`).
-- [ ] `lib/events.ts`: `formatDuration(ms)` (`92ms`, `1.2s`),
+- [x] `lib/events.ts`: `formatDuration(ms)` (`92ms`, `1.2s`),
       `formatRequest(method, url, status | null, ms, pageOrigin)`,
       `formatArgs(args)`, `describeElement(el)` (aria-label, label text,
       innerText, placeholder, name, then tag; 60 chars), `clickText(el)`,
       `inputText(el)`, `navText(url)`, `isFormField(el)`, `event(kind,
 text, isError?)` stamping `at: Date.now()`.
-- [ ] `lib/buffer.ts`: `REPLAY_MS = 120_000`, `MAX_EVENTS = 10_000`,
+- [x] `lib/buffer.ts`: `REPLAY_MS = 120_000`, `MAX_EVENTS = 10_000`,
       `trim(events, now, holdSince)` (keeps events newer than
       `now - REPLAY_MS` or `holdSince`, then the newest `MAX_EVENTS`).
-- [ ] `lib/settings.ts`: `settings = storage.defineItem<Settings>("local:settings", { fallback: DEFAULTS })`,
+- [x] `lib/settings.ts`: `settings = storage.defineItem<Settings>("local:settings", { fallback: DEFAULTS })`,
       `DEFAULTS` per the spec, `defaultsFor(hasTabCapture)` for the
       Firefox record mode, `updateSettings(patch)`, `resetSettings()`.
-- [ ] `lib/drafts.ts`: `Draft` per the plan; `putDraft`, `getDraft`,
+- [x] `lib/drafts.ts`: `Draft` per the plan; `putDraft`, `getDraft`,
       `listDrafts` (newest first), `deleteDraft`; `putSnapshot({tabId,
 at, blob})`, `snapshotsFor(tabId, since)`, `pruneSnapshots(before)`,
       `clearSnapshots()`. One `rewind` database, version 1, stores
       `captures` (key `id`) and `snapshots` (autoincrement, index `at`).
-- [ ] `lib/upload.ts`: `fileDraft({ appUrl, blob, contentType, rewind })`:
+- [x] `lib/upload.ts`: `fileDraft({ appUrl, blob, contentType, rewind })`:
       parses `rewind` with `createRewind` first (throws on invalid),
       `POST /api/uploads`, `PUT` with `Content-Type: contentType` exactly,
       `POST /api/rewinds`; returns `{ id, viewerUrl }`; throws an
       `Error` naming the step and status on any non-2xx.
       `defaultTitle(kind, url)`: `Screenshot of host/path` or
       `Recording of host/path`.
-- [ ] Unit tests for every function and branch.
+- [x] Unit tests for every function and branch.
 
 **Dependencies:** T1 · **Scope:** M
 
 ### Checkpoint A
 
-- [ ] `bun run --filter extension test` at 100%, `lint` and `typecheck` exit 0
-- [ ] Commit
+- [x] `bun run --filter extension test` at 100%, `lint` and `typecheck` exit 0
+- [x] Commit
 
 ## T3: Content scripts
 
-- [ ] `entrypoints/capture-main.content.ts`: `matches: ["http://*/*",
+- [x] `entrypoints/capture-main.content.ts`: `matches: ["http://*/*",
 "https://*/*"]`, `world: "MAIN"`, `runAt: "document_start"`. Wraps
       console, `error`/`unhandledrejection`, `fetch`, XHR, history. Each
       wrapper calls the original and never throws into the page. Posts
@@ -86,7 +86,7 @@ at, blob})`, `snapshotsFor(tabId, since)`, `pruneSnapshots(before)`,
       (`installConsole(win, post)`, `installNetwork(win, post)`,
       `installHistory(win, post)`, `installErrors(win, post)`) so tests
       call them on a happy-dom window.
-- [ ] `entrypoints/capture.content.ts`: same matches, ISOLATED,
+- [x] `entrypoints/capture.content.ts`: same matches, ISOLATED,
       `document_start`. Forwards MAIN events (checks `source` and
       `event.source === window`) with `send({ type: "event" })`. Adds
       `click` (capture phase) and `change` listeners and the first `nav`
@@ -94,7 +94,7 @@ at, blob})`, `snapshotsFor(tabId, since)`, `pruneSnapshots(before)`,
       `select-area` with an overlay in a shadow root: dim the page,
       drag a rectangle, Enter or mouseup confirms, Escape cancels
       (`null`). Returns CSS px plus `viewportWidth`.
-- [ ] Tests on happy-dom: every wrapper's text and `isError`, the
+- [x] Tests on happy-dom: every wrapper's text and `isError`, the
       fallback when `JSON.stringify` throws, failed fetch, XHR status,
       the user-event toggle, the area overlay (confirm and cancel).
 
@@ -102,7 +102,7 @@ at, blob})`, `snapshotsFor(tabId, since)`, `pruneSnapshots(before)`,
 
 ## T4: Background
 
-- [ ] `entrypoints/background.ts` wires `runtime.onMessage`,
+- [x] `entrypoints/background.ts` wires `runtime.onMessage`,
       `tabs.onRemoved`, `commands.onCommand`, `alarms.onAlarm`,
       `storage` changes to handlers in `lib/background/*.ts`:
   - `buffer.ts`: per-tab `Map`, `add(tabId, event)`, `eventsFor(tabId,
@@ -123,21 +123,21 @@ event, now - REPLAY_MS), now]`), then `tabs.create` the editor
     builds a `replay` draft from that tab's snapshots and events (span
     first to last snapshot + 1s) and opens the editor; with no
     snapshots, it opens nothing and returns `{ error }`.
-- [ ] Commands: `screenshot` and `save-replay` act on the active tab.
-- [ ] Tests with `fakeBrowser` (stub `captureVisibleTab` and
+- [x] Commands: `screenshot` and `save-replay` act on the active tab.
+- [x] Tests with `fakeBrowser` (stub `captureVisibleTab` and
       `windows.create`), fake timers for the delay and the loop.
 
 **Dependencies:** T2 · **Scope:** M
 
 ### Checkpoint B
 
-- [ ] Tests at 100%; `bun run --filter extension build` produces
+- [x] Tests at 100%; `bun run --filter extension build` produces
       `chrome-mv3` and `firefox-mv3`
-- [ ] Commit
+- [x] Commit
 
 ## T5: Popup
 
-- [ ] `entrypoints/popup/App.tsx` + `popup.module.css`: home, drafts,
+- [x] `entrypoints/popup/App.tsx` + `popup.module.css`: home, drafts,
       settings per the spec's UI section and the design's markup and
       spacing. Reads the active tab (`tabs.query({ active: true,
 currentWindow: true })`); disables capture on non-`http(s)` pages.
@@ -152,14 +152,14 @@ currentWindow: true })`); disables capture on non-`http(s)` pages.
       `commands.openShortcutSettings()` when present, else opens
       `chrome://extensions/shortcuts`. Open web app opens `appUrl`.
       Applies the theme.
-- [ ] DOM tests (happy-dom, `react-dom/client`, `act`, as
+- [x] DOM tests (happy-dom, `react-dom/client`, `act`, as
       `apps/web/src/app/r/[id]/viewer.test.tsx` does) for every control.
 
 **Dependencies:** T2, T4 message types · **Scope:** M
 
 ## T6: `lib/media.ts` and the recorder
 
-- [ ] `lib/media.ts`: `openTabStream(streamId)`, `openDisplayStream()`,
+- [x] `lib/media.ts`: `openTabStream(streamId)`, `openDisplayStream()`,
       `openMic(deviceId)`, `cropTrack(track, rect)` (processor + generator,
       even-aligned `visibleRect` scaled by `videoWidth / viewportWidth`),
       `startRecorder(stream)` → `{ pause, resume, stop(): Promise<Blob> }`
@@ -170,7 +170,7 @@ currentWindow: true })`); disables capture on non-`http(s)` pages.
 boxes)` → PNG `Blob` with the boxes and labels drawn in at natural
       size. Excluded from unit coverage only if Vitest cannot load
       Mediabunny; otherwise tested with mocks.
-- [ ] `entrypoints/recorder/` (`index.html`, `main.tsx`, `Recorder.tsx`,
+- [x] `entrypoints/recorder/` (`index.html`, `main.tsx`, `Recorder.tsx`,
       `recorder.module.css`): reads `tab`, `mode`, `stream` from the URL.
       Tab/area opens the stream at once (area asks the background, which
       focuses the tab and sends `select-area`; `null` closes the window).
@@ -180,13 +180,13 @@ boxes)` → PNG `Blob` with the boxes and labels drawn in at natural
       track `ended` event stops. Stop saves a `video` draft with
       `send({ type: "events" })` for the spans, clears the hold, opens
       the editor, `window.close()`. Discard clears the hold and closes.
-- [ ] DOM tests with `lib/media.ts` mocked.
+- [x] DOM tests with `lib/media.ts` mocked.
 
 **Dependencies:** T2, T4 · **Scope:** L
 
 ## T7: Editor
 
-- [ ] `entrypoints/editor/` (`index.html`, `main.tsx`, `Editor.tsx`,
+- [x] `entrypoints/editor/` (`index.html`, `main.tsx`, `Editor.tsx`,
       `editor.module.css`): loads the draft from `?id=`; a missing draft
       shows "This draft no longer exists". A `replay` draft is encoded
       with `encodeFrames` first ("Preparing replay…"), then saved back as
@@ -198,18 +198,18 @@ boxes)` → PNG `Blob` with the boxes and labels drawn in at natural
       the viewer per `openInNewTab`; errors keep the draft and show the
       message. Save for later closes the tab; Discard deletes the draft
       and closes the tab.
-- [ ] DOM tests with `lib/media.ts` and `lib/upload.ts` mocked.
+- [x] DOM tests with `lib/media.ts` and `lib/upload.ts` mocked.
 
 **Dependencies:** T2, T6 · **Scope:** L
 
 ### Checkpoint C
 
-- [ ] Tests at 100%, lint, typecheck and build clean
-- [ ] Commit
+- [x] Tests at 100%, lint, typecheck and build clean
+- [x] Commit
 
 ## T8: E2E
 
-- [ ] `playwright.config.ts`: a `webServer` that runs the web app like
+- [x] `playwright.config.ts`: a `webServer` that runs the web app like
       `apps/web/playwright.config.ts` (fresh `e2e.db`, migrate, seed,
       build, start) on port 3200, honoring a real `S3_ENDPOINT`;
       Chromium with the extension, `--use-fake-ui-for-media-stream`,
@@ -218,31 +218,31 @@ boxes)` → PNG `Blob` with the boxes and labels drawn in at natural
       fixture that launches the context, finds the extension id, and
       sets `appUrl` and `reporterName` in `storage.local` via the
       service worker.
-- [ ] A fixture page (a route served by the test with `context.route`
+- [x] A fixture page (a route served by the test with `context.route`
       on `http://fixture.test/`) titled `Rewind fixture` that logs,
       warns, and `fetch`es the web app's `/api/health`.
-- [ ] Specs per the spec's testing strategy: popup views, screenshot
+- [x] Specs per the spec's testing strategy: popup views, screenshot
       to viewer, instant replay to viewer, desktop recording to viewer,
       Firefox `web-ext lint` on `.output/firefox-mv3`.
-- [ ] If a flow cannot run headless, remove its spec, say why in the
+- [x] If a flow cannot run headless, remove its spec, say why in the
       manual check doc, and report it.
 
 **Dependencies:** T3-T7 · **Scope:** M
 
 ## T9: Docs
 
-- [ ] `docs/extension-manual-check.md`: load unpacked in Chrome, tab
+- [x] `docs/extension-manual-check.md`: load unpacked in Chrome, tab
       and area recording with real `tabCapture`, microphone prompt and
       device choice, and each flow in Firefox via `bunx web-ext run -s
 apps/extension/.output/firefox-mv3`.
-- [ ] `docs/STACK.md`: extension structure (entrypoints, `lib/`), the
+- [x] `docs/STACK.md`: extension structure (entrypoints, `lib/`), the
       Firefox MV3 output, the e2e's web server and port.
-- [ ] `learning/MEMORY.md` line for the extension.
+- [x] `learning/MEMORY.md` line for the extension.
 
 **Dependencies:** T8 · **Scope:** XS
 
 ### Checkpoint: Complete
 
-- [ ] The five success criteria in `SPEC-extension.md` hold, with evidence
-- [ ] `/security-review`, `/performance`, `/documentation-and-adrs`
-- [ ] The learn skill updates `learning/`
+- [x] The five success criteria in `SPEC-extension.md` hold, with evidence
+- [x] `/security-review`, `/performance`, `/documentation-and-adrs`
+- [x] The learn skill updates `learning/`
