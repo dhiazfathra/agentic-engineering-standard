@@ -9,6 +9,7 @@ import {
   useReducer,
   useRef,
   useState,
+  useSyncExternalStore,
   type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
@@ -43,6 +44,21 @@ type Props = {
   folders: FolderListItem[];
   view: LibraryView;
   folderId?: string;
+};
+
+/**
+ * `useSyncExternalStore` source for `rw-dark`. `notify` runs after every
+ * `setTheme` write (see `toggleDark`), including the one the theme init
+ * script's DOM change causes before React ever mounts.
+ */
+const themeStore = {
+  listeners: new Set<() => void>(),
+  subscribe(cb: () => void) {
+    themeStore.listeners.add(cb);
+    return () => themeStore.listeners.delete(cb);
+  },
+  getSnapshot: () => document.body.classList.contains("rw-dark"),
+  notify: () => themeStore.listeners.forEach((cb) => cb()),
 };
 
 const VIEWS: { key: LibraryView; label: string }[] = [
@@ -100,10 +116,17 @@ export function Library(props: Props) {
   });
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
-  const [dark, setDark] = useState(
-    () =>
-      typeof document !== "undefined" &&
-      document.body.classList.contains("rw-dark"),
+  // Reads `rw-dark` off `<body>` through useSyncExternalStore instead of
+  // useState: the theme init script (root layout) applies that class
+  // before React hydrates, so a useState initializer reading it directly
+  // would return `true` on the client's first render while the server
+  // (no DOM) always rendered `false`, a hydration mismatch. The server
+  // snapshot below keeps that first render in sync with the server;
+  // getSnapshot then picks up the real value once mounted.
+  const dark = useSyncExternalStore(
+    themeStore.subscribe,
+    themeStore.getSnapshot,
+    () => false,
   );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -408,8 +431,8 @@ export function Library(props: Props) {
   });
 
   const toggleDark = (next: boolean) => {
-    setDark(next);
     setTheme(next);
+    themeStore.notify();
   };
 
   const closePalette = useCallback(() => {

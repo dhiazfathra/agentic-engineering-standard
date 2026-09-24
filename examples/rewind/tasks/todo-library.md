@@ -144,7 +144,7 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ## T10: E2E
 
-- [ ] `apps/web/e2e/library.spec.ts` on the seeded DB covers success
+- [x] `apps/web/e2e/library.spec.ts` on the seeded DB covers success
       criteria 1 to 6: three views, folder filter, rename after reload,
       delete then Undo, delete then `×`, an open toast sending nothing, board `dragTo` after reload, `⌘K` to
       a Rewind, dark mode after reload and on `/r/seed-r1`.
@@ -154,8 +154,8 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ## T11: Docs
 
-- [ ] `docs/STACK.md`: `/` library, new lib and component files, e2e list.
-- [ ] `learning/MEMORY.md` line for the library.
+- [x] `docs/STACK.md`: `/` library, new lib and component files, e2e list.
+- [x] `learning/MEMORY.md` line for the library.
 
 **Dependencies:** T10 · **Scope:** XS
 
