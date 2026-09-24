@@ -6,6 +6,7 @@ import {
   installErrors,
   installHistory,
   installNetwork,
+  makeSend,
 } from "../entrypoints/capture-main.content";
 import type { CapturedEvent } from "../lib/messages";
 
@@ -257,19 +258,107 @@ describe("installNetwork", () => {
   });
 });
 
+// Real `postMessage` delivery doesn't reliably preserve `event.source` in
+// happy-dom (see the same note on `forwardMainEvent` in capture.content.ts),
+// so simulating ISOLATED's reply dispatches a synthetic `message` event with
+// `source: window` set explicitly, like the other content-script tests do.
+function dispatchFromSelf(data: unknown): void {
+  window.dispatchEvent(
+    new MessageEvent("message", { data, source: window as unknown as Window }),
+  );
+}
+
 describe("entrypoint", () => {
-  it("wires every wrapper and posts events to the isolated world", async () => {
-    let posted: MessageEvent | undefined;
+  it("wires every wrapper and posts events to the isolated world once it announces ready", async () => {
+    const posted: MessageEvent[] = [];
     window.addEventListener("message", (e) => {
-      posted = e as MessageEvent;
+      posted.push(e as MessageEvent);
     });
     expect(() => (capture.main as () => void)()).not.toThrow();
     window.console.log("hello");
+    dispatchFromSelf({ source: "rewind", ready: true });
     await vi.waitFor(() =>
-      expect(posted?.data).toMatchObject({
+      expect(posted.map((e) => e.data)).toContainEqual({
         source: "rewind",
-        event: { kind: "log", text: "hello" },
+        event: expect.objectContaining({ kind: "log", text: "hello" }),
       }),
     );
+  });
+});
+
+describe("makeSend", () => {
+  it("posts a hello handshake message on install", async () => {
+    const posted: unknown[] = [];
+    window.addEventListener("message", (e) => posted.push(e.data));
+    makeSend(window);
+    await vi.waitFor(() =>
+      expect(posted).toContainEqual({ source: "rewind", hello: true }),
+    );
+  });
+
+  it("queues events until isolated replies ready, then flushes in order", async () => {
+    const send = makeSend(window);
+    const posted: unknown[] = [];
+    window.addEventListener("message", (e) => {
+      const data = e.data as { event?: unknown };
+      if (data?.event) posted.push(data);
+    });
+    send({ at: 1, kind: "log", text: "a", isError: false });
+    send({ at: 2, kind: "log", text: "b", isError: false });
+    expect(posted).toHaveLength(0);
+    dispatchFromSelf({ source: "rewind", ready: true });
+    await vi.waitFor(() =>
+      expect(
+        posted.map((p) => (p as { event: { text: string } }).event.text),
+      ).toEqual(["a", "b"]),
+    );
+  });
+
+  it("posts directly once ready, without re-queuing", async () => {
+    const send = makeSend(window);
+    dispatchFromSelf({ source: "rewind", ready: true });
+    const posted: unknown[] = [];
+    window.addEventListener("message", (e) => {
+      const data = e.data as { event?: unknown };
+      if (data?.event) posted.push(data);
+    });
+    send({ at: 1, kind: "log", text: "c", isError: false });
+    await vi.waitFor(() =>
+      expect(posted).toEqual([
+        {
+          source: "rewind",
+          event: { at: 1, kind: "log", text: "c", isError: false },
+        },
+      ]),
+    );
+  });
+
+  it("caps the queue at 1000, dropping the oldest", async () => {
+    const send = makeSend(window);
+    for (let i = 0; i < 1001; i++) {
+      send({ at: i, kind: "log", text: String(i), isError: false });
+    }
+    const posted: unknown[] = [];
+    window.addEventListener("message", (e) => {
+      const data = e.data as { event?: { at: number } };
+      if (data?.event) posted.push(data.event.at);
+    });
+    dispatchFromSelf({ source: "rewind", ready: true });
+    await vi.waitFor(() => expect(posted).toHaveLength(1000));
+    expect(posted[0]).toBe(1);
+    expect(posted[posted.length - 1]).toBe(1000);
+  });
+
+  it("ignores a non-rewind or non-ready message", () => {
+    const send = makeSend(window);
+    dispatchFromSelf({ source: "other", ready: true });
+    dispatchFromSelf({ source: "rewind", ready: false });
+    const posted: unknown[] = [];
+    window.addEventListener("message", (e) => {
+      const data = e.data as { event?: unknown };
+      if (data?.event) posted.push(data);
+    });
+    send({ at: 1, kind: "log", text: "x", isError: false });
+    expect(posted).toHaveLength(0);
   });
 });

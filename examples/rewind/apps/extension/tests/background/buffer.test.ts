@@ -84,6 +84,16 @@ describe("buffer", () => {
     expect(await raw(5)).toEqual([]);
   });
 
+  it("survives two concurrent `add`s on a cold buffer (no lost load overwrite)", async () => {
+    vi.resetModules();
+    const cold = await import("../../lib/background/buffer");
+    await Promise.all([
+      cold.add(9, eventAt(BASE)),
+      cold.add(9, eventAt(BASE + 1)),
+    ]);
+    expect((await cold.raw(9)).map((e) => e.at)).toEqual([BASE, BASE + 1]);
+  });
+
   it("debounces the save to storage.session", async () => {
     await add(6, eventAt(BASE));
     await add(6, eventAt(BASE + 1));

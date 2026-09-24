@@ -7,8 +7,40 @@ import type { CapturedEvent } from "../lib/messages";
 type Win = typeof window;
 type Send = (e: CapturedEvent) => void;
 
+// document_start doesn't guarantee this (MAIN) script runs before or after
+// the ISOLATED script attaches its `message` listener. Queue events until
+// ISOLATED confirms it's ready, then flush; a hello/ready handshake covers
+// either load order.
+const QUEUE_CAP = 1000;
+
 function post(win: Win, e: CapturedEvent): void {
   win.postMessage({ source: "rewind", event: e }, win.location.origin);
+}
+
+/** Queues events posted before ISOLATED is confirmed ready, then flushes once it is. */
+export function makeSend(win: Win): Send {
+  let ready = false;
+  const queue: CapturedEvent[] = [];
+
+  win.addEventListener("message", (e: MessageEvent) => {
+    if (e.source !== win) return;
+    const data = e.data as { source?: string; ready?: boolean } | undefined;
+    if (data?.source !== "rewind" || !data.ready) return;
+    if (ready) return;
+    ready = true;
+    for (const queued of queue) post(win, queued);
+    queue.length = 0;
+  });
+  win.postMessage({ source: "rewind", hello: true }, win.location.origin);
+
+  return (e) => {
+    if (ready) {
+      post(win, e);
+      return;
+    }
+    queue.push(e);
+    if (queue.length > QUEUE_CAP) queue.shift();
+  };
 }
 
 /** Wraps `console.log/info/debug` (log), `console.warn` (warn), `console.error` (err). */
@@ -208,7 +240,7 @@ export default defineContentScript({
   world: "MAIN",
   runAt: "document_start",
   main() {
-    const send: Send = (e) => post(window, e);
+    const send: Send = makeSend(window);
     installConsole(window, send);
     installErrors(window, send);
     installNetwork(window, send);

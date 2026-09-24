@@ -23,19 +23,27 @@ const holdsStore = storage.defineItem<Holds>("session:holds", {
 // first call; afterwards every read and write stays in memory, and saves are
 // debounced so a burst of events costs one write.
 let buffers: TabBuffers | undefined;
+let loading: Promise<TabBuffers> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 // Holds are rare (recording start/stop) and must survive a worker restart
 // immediately, so they're written through on every change instead of debounced.
 let holds: Holds | undefined;
+let loadingHolds: Promise<Holds> | undefined;
 
+// Memoized so two concurrent first calls share one in-flight read instead of
+// each awaiting `store.getValue()` separately: the second would otherwise
+// overwrite `buffers` with the stale value it started with, discarding
+// whatever the first caller's `add` already pushed into it.
 async function load(): Promise<TabBuffers> {
-  buffers ??= await store.getValue();
-  return buffers;
+  if (buffers) return buffers;
+  loading ??= store.getValue().then((v) => (buffers = v));
+  return loading;
 }
 
 async function loadHolds(): Promise<Holds> {
-  holds ??= await holdsStore.getValue();
-  return holds;
+  if (holds) return holds;
+  loadingHolds ??= holdsStore.getValue().then((v) => (holds = v));
+  return loadingHolds;
 }
 
 function scheduleSave(): void {
@@ -53,8 +61,11 @@ export async function add(
   capturedEvent: CapturedEvent,
 ): Promise<void> {
   const all = await load();
-  const events = all[tabId] ?? [];
   const tabHolds = await loadHolds();
+  // No `await` between this read and the write below: two concurrent `add`s
+  // on the same cold tab would otherwise both read the buffer as empty
+  // before either writes, and the second write would drop the first event.
+  const events = all[tabId] ?? [];
   all[tabId] = trim(
     [...events, capturedEvent],
     Date.now(),

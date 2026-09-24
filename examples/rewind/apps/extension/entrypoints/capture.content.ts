@@ -31,6 +31,21 @@ export function forwardMainEvent(
   onEvent(data.event);
 }
 
+/**
+ * Handshake with MAIN world's `capture-main.content.ts`: whichever of the two
+ * document_start scripts loads first, the other replies `ready` so MAIN can
+ * flush events it queued before ISOLATED's listener existed.
+ */
+export function announceReady(win: Window): void {
+  win.addEventListener("message", (e: MessageEvent) => {
+    if (e.source !== win) return;
+    const data = e.data as { source?: string; hello?: boolean } | undefined;
+    if (data?.source !== "rewind" || !data.hello) return;
+    win.postMessage({ source: "rewind", ready: true }, win.location.origin);
+  });
+  win.postMessage({ source: "rewind", ready: true }, win.location.origin);
+}
+
 /** Draws a drag-to-select overlay in a shadow root; Escape cancels, mouseup/Enter confirms. */
 export function selectArea(doc: Document): Promise<Rect | null> {
   return new Promise((resolve) => {
@@ -139,6 +154,7 @@ export default defineContentScript({
         void send({ type: "event", event: capturedEvent });
       });
     });
+    announceReady(window);
 
     document.addEventListener(
       "click",

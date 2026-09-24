@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import capture, {
+  announceReady,
   forwardMainEvent,
   maybeSendInitialNav,
   selectArea,
@@ -80,6 +81,50 @@ describe("forwardMainEvent", () => {
       onEvent,
     );
     expect(onEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("announceReady", () => {
+  it("posts ready immediately on install", () => {
+    const postSpy = vi.spyOn(window, "postMessage");
+    announceReady(window);
+    expect(postSpy).toHaveBeenCalledWith(
+      { source: "rewind", ready: true },
+      window.location.origin,
+    );
+  });
+
+  it("replies ready when MAIN sends hello", () => {
+    announceReady(window);
+    const postSpy = vi.spyOn(window, "postMessage");
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { source: "rewind", hello: true },
+        source: window,
+      }),
+    );
+    expect(postSpy).toHaveBeenCalledWith(
+      { source: "rewind", ready: true },
+      window.location.origin,
+    );
+  });
+
+  it("ignores a message from another window or not tagged as hello", () => {
+    announceReady(window);
+    const postSpy = vi.spyOn(window, "postMessage");
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { source: "rewind", hello: true },
+        source: {} as Window,
+      }),
+    );
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: { source: "other", hello: true },
+        source: window,
+      }),
+    );
+    expect(postSpy).not.toHaveBeenCalled();
   });
 });
 
