@@ -222,6 +222,40 @@ describe("Recorder: mode=tab", () => {
     expect(closeSpy).toHaveBeenCalled();
   });
 
+  it("Closing the recorder window mid-recording releases the hold", async () => {
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+    send.mockClear();
+
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(send).toHaveBeenCalledWith({
+      type: "recording",
+      tabId: 5,
+      since: null,
+    });
+  });
+
+  it("pagehide after Stop does not send a second release", async () => {
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+    const stopButton = container.querySelector(
+      'button[aria-label="Stop"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+    send.mockClear();
+
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("A second Stop click while the first is finalizing is a no-op", async () => {
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");

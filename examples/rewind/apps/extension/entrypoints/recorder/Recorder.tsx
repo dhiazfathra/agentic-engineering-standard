@@ -180,9 +180,16 @@ export default function Recorder() {
       if (!cancelled) await afterVideoTrack(video);
     }
 
+    function release(): void {
+      if (!stoppingRef.current)
+        void send({ type: "recording", tabId, since: null });
+    }
+
     void init();
+    window.addEventListener("pagehide", release);
     return () => {
       cancelled = true;
+      window.removeEventListener("pagehide", release);
     };
     // Params never change after mount; this effect runs exactly once.
   }, []);
