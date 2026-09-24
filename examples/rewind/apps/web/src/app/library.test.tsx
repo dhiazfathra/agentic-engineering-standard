@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FolderListItem, RewindListItem } from "@/lib/rewinds";
 
 const replace = vi.fn();
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, push }),
 }));
 
 const { Library } = await import("./library");
@@ -74,6 +75,8 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   replace.mockReset();
+  push.mockReset();
+  document.body.className = "";
   stubClipboard(vi.fn().mockResolvedValue(undefined));
 });
 
@@ -411,6 +414,11 @@ describe("context menu", () => {
     expect(menu.getAttribute("aria-label")).toBe(`Actions for ${TITLE}`);
     expect(qAll('[role="menuitem"]').map((i) => i.textContent)).toEqual([
       "Rename",
+      "Move to All Rewinds",
+      "Set status: New",
+      "Set status: Triaging",
+      "Set status: In progress",
+      "Set status: Fixed",
       "Delete Rewind",
     ]);
     expect(document.activeElement).toBe(menuItem("Rename"));
@@ -913,5 +921,542 @@ describe("folders", () => {
     mountFolders("f1");
     deleteFolder();
     expect(replace).toHaveBeenCalledWith("/");
+  });
+});
+
+function dataTransferStub(id: string) {
+  const store: Record<string, string> = {};
+  return {
+    setData: (k: string, v: string) => {
+      store[k] = v;
+    },
+    getData: (k: string) => store[k] ?? id,
+  };
+}
+
+function dragEvent(type: string, id: string) {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "dataTransfer", {
+    value: dataTransferStub(id),
+  });
+  return event as unknown as Event;
+}
+
+function drop(el: HTMLElement, id: string) {
+  act(() => {
+    el.dispatchEvent(dragEvent("drop", id));
+  });
+}
+
+function dragEnter(el: HTMLElement) {
+  act(() => {
+    el.dispatchEvent(new Event("dragenter", { bubbles: true }));
+  });
+}
+
+function dragLeave(el: HTMLElement) {
+  act(() => {
+    el.dispatchEvent(new Event("dragleave", { bubbles: true }));
+  });
+}
+
+function dragStart(el: HTMLElement) {
+  let sentId: string | undefined;
+  const event = new Event("dragstart", { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "dataTransfer", {
+    value: {
+      setData: (_k: string, v: string) => {
+        sentId = v;
+      },
+    },
+  });
+  act(() => {
+    el.dispatchEvent(event);
+  });
+  return sentId;
+}
+
+describe("drag and drop", () => {
+  function mountBoard() {
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", status: "new" })]}
+        folders={[folder()]}
+        view="board"
+        folderId={undefined}
+      />,
+    );
+  }
+
+  it("dragstart puts the Rewind id on the dataTransfer", () => {
+    mountBoard();
+    const cardEl = qAll("section")[0].querySelector("a")!.parentElement!;
+    expect(dragStart(cardEl)).toBe("a");
+  });
+
+  it("dropping a card on a column sends PATCH status and toasts", async () => {
+    const fetchMock = stubFetch();
+    mountBoard();
+    const columns = qAll("section");
+    drop(columns[2], "a");
+    await flush();
+    expect(container.textContent).toContain("Moved to In progress");
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "progress" }),
+    });
+  });
+
+  it("dropping on the same column's status does nothing", async () => {
+    const fetchMock = stubFetch();
+    mountBoard();
+    drop(qAll("section")[0], "a");
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("dropping an unknown id does nothing", async () => {
+    const fetchMock = stubFetch();
+    mountBoard();
+    drop(qAll("section")[1], "missing");
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("dragenter/dragleave toggle the column highlight, ignoring an unrelated leave", () => {
+    mountBoard();
+    const columns = qAll("section");
+    dragEnter(columns[1]);
+    expect(columns[1].className).toContain("columnDropTarget");
+    dragLeave(columns[0]);
+    expect(columns[1].className).toContain("columnDropTarget");
+    dragLeave(columns[1]);
+    expect(columns[1].className).not.toContain("columnDropTarget");
+  });
+
+  it("a failed status write reverts and toasts", async () => {
+    stubFetch(false);
+    mountBoard();
+    drop(qAll("section")[2], "a");
+    await flush();
+    expect(container.textContent).toContain("Could not move Rewind");
+  });
+
+  it("dropping a card on a sidebar folder sends PATCH folderId", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", folderId: null })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    drop(folderButton(), "a");
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folderId: "f1" }),
+    });
+  });
+
+  it("dropping on All Rewinds sends folderId null", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", folderId: "f1" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    const allButton = qAll("button").find(
+      (b) => b.textContent === "All Rewinds",
+    )!;
+    drop(allButton, "a");
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folderId: null }),
+    });
+  });
+
+  it("dragging onto the same folder does nothing", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", folderId: "f1" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    drop(folderButton(), "a");
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("dragenter/dragleave toggle the All Rewinds highlight, ignoring an unrelated leave", () => {
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", folderId: "f1" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    const allButton = qAll("button").find(
+      (b) => b.textContent === "All Rewinds",
+    )!;
+    dragEnter(allButton);
+    expect(allButton.className).toContain("dropTarget");
+    dragLeave(folderButton());
+    expect(allButton.className).toContain("dropTarget");
+    dragLeave(allButton);
+    expect(allButton.className).not.toContain("dropTarget");
+  });
+
+  it("dropping an unknown id on a folder does nothing", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    drop(folderButton(), "missing");
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("dragenter/dragleave toggle the folder highlight", () => {
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    const btn = folderButton();
+    dragEnter(btn);
+    expect(btn.className).toContain("dropTarget");
+    dragLeave(btn);
+    expect(btn.className).not.toContain("dropTarget");
+  });
+
+  it("the context menu's Move to folder and Set status call the same handlers", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to Checkout bugs"));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folderId: "f1" }),
+    });
+
+    fetchMock.mockClear();
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Set status: Fixed"));
+    await flush();
+    expect(container.textContent).toContain("Moved to Fixed");
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "done" }),
+    });
+  });
+
+  it("Move to All Rewinds files a Rewind out of its folder", async () => {
+    const fetchMock = stubFetch();
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a", folderId: "f1" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to All Rewinds"));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/rewinds/a", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ folderId: null }),
+    });
+  });
+
+  it("a failed folder move reverts and toasts", async () => {
+    stubFetch(false);
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+    click(q(`[aria-label="Actions for ${TITLE}"]`));
+    click(menuItem("Move to Checkout bugs"));
+    await flush();
+    expect(container.textContent).toContain("Could not move Rewind");
+  });
+
+  it("onDragOver over a column and a folder prevents the default", () => {
+    mountBoard();
+    const column = qAll("section")[1];
+    const columnEvent = new Event("dragover", {
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      column.dispatchEvent(columnEvent);
+    });
+    expect(columnEvent.defaultPrevented).toBe(true);
+
+    const allButton = qAll("button").find(
+      (b) => b.textContent === "All Rewinds",
+    )!;
+    const folderEvent = new Event("dragover", {
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      allButton.dispatchEvent(folderEvent);
+    });
+    expect(folderEvent.defaultPrevented).toBe(true);
+  });
+});
+
+function openPalette() {
+  act(() => {
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }),
+    );
+  });
+}
+
+function paletteInput(): HTMLInputElement {
+  return q('input[role="combobox"]') as HTMLInputElement;
+}
+
+describe("palette", () => {
+  function mountPalette() {
+    mount(
+      <Library
+        rewinds={[rewind({ id: "a" })]}
+        folders={[folder()]}
+        view="grid"
+        folderId={undefined}
+      />,
+    );
+  }
+
+  it("Cmd+K opens it, focused, and Escape closes it", () => {
+    mountPalette();
+    openPalette();
+    expect(q('[role="dialog"]').getAttribute("aria-modal")).toBe("true");
+    key(paletteInput(), "Escape");
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("Cmd+K again closes it", () => {
+    mountPalette();
+    openPalette();
+    openPalette();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("the sidebar search button opens it", () => {
+    mountPalette();
+    const searchButton = qAll("button").find((b) =>
+      b.textContent?.includes("Search or jump to…"),
+    )!;
+    click(searchButton);
+    expect(container.querySelector('[role="dialog"]')).toBeTruthy();
+  });
+
+  it("filters case-insensitively, shows No results when empty", () => {
+    mountPalette();
+    openPalette();
+    type(paletteInput(), "checkout fails");
+    expect(qAll('[role="option"]')).toHaveLength(1);
+    type(paletteInput(), "zzz-nothing-matches");
+    expect(container.textContent).toContain("No results");
+  });
+
+  it("resets the selection to 0 when the query changes", () => {
+    mountPalette();
+    openPalette();
+    key(paletteInput(), "ArrowDown");
+    type(paletteInput(), "a");
+    expect(qAll('[role="option"]')[0].getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
+
+  it("ArrowDown/ArrowUp move the selection and wrap", () => {
+    mountPalette();
+    openPalette();
+    key(paletteInput(), "ArrowUp");
+    const options = qAll('[role="option"]');
+    expect(options[options.length - 1].getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    key(paletteInput(), "ArrowDown");
+    expect(options[0].getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("mouse hover moves the selection", () => {
+    mountPalette();
+    openPalette();
+    const options = qAll('[role="option"]');
+    act(() => {
+      options[1].dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    expect(options[1].getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("Enter on All Rewinds navigates and closes", () => {
+    mountPalette();
+    openPalette();
+    key(paletteInput(), "Enter");
+    expect(replace).toHaveBeenCalledWith("/");
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("Enter on a folder item navigates to it", () => {
+    mountPalette();
+    openPalette();
+    type(paletteInput(), "Checkout bugs");
+    key(paletteInput(), "Enter");
+    expect(replace).toHaveBeenCalledWith("/?folder=f1");
+  });
+
+  it("Enter on a view item switches the view", () => {
+    mountPalette();
+    openPalette();
+    type(paletteInput(), "Switch to board view");
+    key(paletteInput(), "Enter");
+    expect(replace).toHaveBeenCalledWith("/?view=board");
+  });
+
+  it("Enter on a Rewind pushes its page", () => {
+    mountPalette();
+    openPalette();
+    type(paletteInput(), TITLE);
+    key(paletteInput(), "Enter");
+    expect(push).toHaveBeenCalledWith("/r/a");
+  });
+
+  it("clicking an item runs it", () => {
+    mountPalette();
+    openPalette();
+    click(qAll('[role="option"]')[0]);
+    expect(replace).toHaveBeenCalledWith("/");
+  });
+
+  it("clicking the backdrop closes it", () => {
+    mountPalette();
+    openPalette();
+    const backdrop = container.querySelector('[role="dialog"]')!
+      .previousElementSibling as HTMLElement;
+    click(backdrop);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("Enter with no results does nothing", () => {
+    mountPalette();
+    openPalette();
+    type(paletteInput(), "zzz-nothing-matches");
+    key(paletteInput(), "Enter");
+    expect(replace).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("arrow keys with no results do nothing", () => {
+    mountPalette();
+    openPalette();
+    type(paletteInput(), "zzz-nothing-matches");
+    key(paletteInput(), "ArrowDown");
+    key(paletteInput(), "ArrowUp");
+    expect(qAll('[role="option"]')).toHaveLength(0);
+  });
+
+  it("an unrelated key does nothing", () => {
+    mountPalette();
+    openPalette();
+    key(paletteInput(), "a");
+    expect(replace).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+    expect(paletteInput()).toBeTruthy();
+  });
+
+  it("the theme item toggles dark mode and closes", () => {
+    mountPalette();
+    openPalette();
+    type(paletteInput(), "Switch to dark mode");
+    key(paletteInput(), "Enter");
+    expect(document.body.classList.contains("rw-dark")).toBe(true);
+    expect(localStorage.getItem("rewind-theme")).toBe("dark");
+  });
+});
+
+describe("dark mode", () => {
+  it("starts light when body has no rw-dark class", () => {
+    mount(
+      <Library rewinds={[]} folders={[]} view="grid" folderId={undefined} />,
+    );
+    const toggle = q('[aria-label="Toggle dark mode"]');
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("starts dark when body already has rw-dark", () => {
+    document.body.classList.add("rw-dark");
+    mount(
+      <Library rewinds={[]} folders={[]} view="grid" folderId={undefined} />,
+    );
+    const toggle = q('[aria-label="Toggle dark mode"]');
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("the toggle flips the class and writes storage", () => {
+    mount(
+      <Library rewinds={[]} folders={[]} view="grid" folderId={undefined} />,
+    );
+    const toggle = q('[aria-label="Toggle dark mode"]');
+    click(toggle);
+    expect(document.body.classList.contains("rw-dark")).toBe(true);
+    expect(localStorage.getItem("rewind-theme")).toBe("dark");
+    click(toggle);
+    expect(document.body.classList.contains("rw-dark")).toBe(false);
+    expect(localStorage.getItem("rewind-theme")).toBe("light");
+  });
+
+  it("still toggles for the session when storage is blocked", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    mount(
+      <Library rewinds={[]} folders={[]} view="grid" folderId={undefined} />,
+    );
+    const toggle = q('[aria-label="Toggle dark mode"]');
+    click(toggle);
+    expect(document.body.classList.contains("rw-dark")).toBe(true);
   });
 });

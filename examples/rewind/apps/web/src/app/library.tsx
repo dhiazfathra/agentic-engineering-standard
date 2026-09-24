@@ -9,6 +9,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { RewindStatus } from "@rewind/schema";
@@ -18,12 +19,16 @@ import { usePendingDeletes } from "@/lib/use-pending-deletes";
 import {
   boardColumns,
   filterByFolder,
+  filterPalette,
   folderCounts,
   libraryReducer,
   nextFolderName,
+  paletteItems,
   type LibraryView,
+  type PaletteItem,
 } from "@/lib/library";
 import type { FolderListItem, RewindListItem } from "@/lib/rewinds";
+import { setTheme } from "@/lib/theme";
 import {
   formatTime,
   initials,
@@ -95,6 +100,24 @@ export function Library(props: Props) {
   });
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [editing, setEditing] = useState<Editing>(null);
+  const [dark, setDark] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.body.classList.contains("rw-dark"),
+  );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState(0);
+  const [dropTarget, setDropTarget] = useState<string | null | undefined>(
+    undefined,
+  );
+  const [columnDropTarget, setColumnDropTarget] = useState<
+    RewindStatus | undefined
+  >(undefined);
+  // Set right before navigating away from the folder being deleted, so a
+  // stale `folderId` prop (the URL replace lands a tick later) does not
+  // flash "Folder not found" in between. Cleared once the prop catches up.
+  const [leavingFolderId, setLeavingFolderId] = useState<string | null>(null);
 
   const showError = useCallback(
     (text: string) => showToast(text, "error"),
@@ -211,7 +234,10 @@ export function Library(props: Props) {
       .filter((r) => r.folderId === f.id)
       .map((r) => r.id);
     dispatch({ type: "removeFolder", id: f.id });
-    if (folderId === f.id) goToFolder(undefined);
+    if (folderId === f.id) {
+      setLeavingFolderId(f.id);
+      goToFolder(undefined);
+    }
     deleteLater(
       `Folder “${f.name}” deleted`,
       `/api/folders/${f.id}`,
@@ -235,6 +261,18 @@ export function Library(props: Props) {
         label: "Rename",
         onSelect: () => setEditing({ kind: "rewind", id: r.id }),
       },
+      {
+        label: "Move to All Rewinds",
+        onSelect: () => moveRewindToFolder(r, null),
+      },
+      ...folders.map((f) => ({
+        label: `Move to ${f.name}`,
+        onSelect: () => moveRewindToFolder(r, f.id),
+      })),
+      ...(Object.keys(STATUS_LABEL) as RewindStatus[]).map((status) => ({
+        label: `Set status: ${STATUS_LABEL[status]}`,
+        onSelect: () => setRewindStatus(r, status),
+      })),
       { label: "Delete Rewind", danger: true, onSelect: () => deleteRewind(r) },
     ]);
 
@@ -271,10 +309,11 @@ export function Library(props: Props) {
   const counts = useMemo(() => folderCounts(rewinds), [rewinds]);
   const activeFolder =
     folderId === undefined ? undefined : folders.find((f) => f.id === folderId);
-  const folderNotFound = folderId !== undefined && !activeFolder;
+  const folderNotFound =
+    folderId !== undefined && !activeFolder && leavingFolderId !== folderId;
   const shownRewinds = folderNotFound ? [] : filterByFolder(rewinds, folderId);
   const title =
-    folderId === undefined
+    folderId === undefined || leavingFolderId === folderId
       ? "All Rewinds"
       : folderNotFound
         ? "Folder not found"
@@ -308,17 +347,141 @@ export function Library(props: Props) {
     }
   };
 
+  const setRewindStatus = (r: RewindListItem, status: RewindStatus) => {
+    if (status === r.status) return;
+    dispatch({ type: "setStatus", id: r.id, status });
+    showToast(`Moved to ${STATUS_LABEL[status]}`);
+    void write(
+      `/api/rewinds/${r.id}`,
+      "PATCH",
+      { status },
+      () => dispatch({ type: "setStatus", id: r.id, status: r.status }),
+      "Could not move Rewind",
+    );
+  };
+
+  const moveRewindToFolder = (r: RewindListItem, folder: string | null) => {
+    if (folder === r.folderId) return;
+    dispatch({ type: "setFolder", id: r.id, folderId: folder });
+    void write(
+      `/api/rewinds/${r.id}`,
+      "PATCH",
+      { folderId: folder },
+      () => dispatch({ type: "setFolder", id: r.id, folderId: r.folderId }),
+      "Could not move Rewind",
+    );
+  };
+
+  const dragRewindId = (e: ReactDragEvent) =>
+    e.dataTransfer.getData("text/plain");
+
+  const draggableProps = (r: RewindListItem) => ({
+    draggable: true,
+    onDragStart: (e: ReactDragEvent) =>
+      e.dataTransfer.setData("text/plain", r.id),
+  });
+
+  const columnDropProps = (status: RewindStatus) => ({
+    onDragOver: (e: ReactDragEvent) => e.preventDefault(),
+    onDragEnter: () => setColumnDropTarget(status),
+    onDragLeave: () =>
+      setColumnDropTarget((cur) => (cur === status ? undefined : cur)),
+    onDrop: (e: ReactDragEvent) => {
+      e.preventDefault();
+      setColumnDropTarget(undefined);
+      const dragged = rewinds.find((x) => x.id === dragRewindId(e));
+      if (dragged) setRewindStatus(dragged, status);
+    },
+  });
+
+  const folderDropProps = (folder: string | null) => ({
+    onDragOver: (e: ReactDragEvent) => e.preventDefault(),
+    onDragEnter: () => setDropTarget(folder),
+    onDragLeave: () =>
+      setDropTarget((cur) => (cur === folder ? undefined : cur)),
+    onDrop: (e: ReactDragEvent) => {
+      e.preventDefault();
+      setDropTarget(undefined);
+      const dragged = rewinds.find((x) => x.id === dragRewindId(e));
+      if (dragged) moveRewindToFolder(dragged, folder);
+    },
+  });
+
+  const toggleDark = (next: boolean) => {
+    setDark(next);
+    setTheme(next);
+  };
+
+  const closePalette = useCallback(() => {
+    setPaletteOpen(false);
+    setQuery("");
+    setSelected(0);
+  }, []);
+
+  const openPalette = useCallback(() => {
+    setPaletteOpen(true);
+    setQuery("");
+    setSelected(0);
+  }, []);
+
+  const runPaletteItem = (item: PaletteItem) => {
+    closePalette();
+    switch (item.kind) {
+      case "all":
+        goToFolder(undefined);
+        break;
+      case "folder":
+        goToFolder(item.id);
+        break;
+      case "view":
+        goToView(item.id);
+        break;
+      case "theme":
+        toggleDark(item.dark);
+        break;
+      case "rewind":
+        router.push(`/r/${item.id}`);
+        break;
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((open) => {
+          if (open) {
+            setQuery("");
+            setSelected(0);
+            return false;
+          }
+          setQuery("");
+          setSelected(0);
+          return true;
+        });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  const items = useMemo(
+    () => filterPalette(paletteItems(rewinds, folders, dark), query),
+    [rewinds, folders, dark, query],
+  );
+
   return (
     <div className={styles.page}>
       <aside className={styles.sidebar}>
-        <button type="button" className={styles.search}>
+        <button type="button" className={styles.search} onClick={openPalette}>
           <span className={styles.searchLabel}>Search or jump to…</span>
           <span className={styles.kbd}>⌘K</span>
         </button>
         <button
           type="button"
-          className={`${styles.navItem} ${folderId === undefined ? styles.navActive : ""}`}
+          className={`${styles.navItem} ${folderId === undefined ? styles.navActive : ""} ${dropTarget === null ? styles.dropTarget : ""}`}
           onClick={() => goToFolder(undefined)}
+          {...folderDropProps(null)}
         >
           All Rewinds
         </button>
@@ -350,8 +513,9 @@ export function Library(props: Props) {
             >
               <button
                 type="button"
-                className={`${styles.navItem} ${folderId === f.id ? styles.navActive : ""}`}
+                className={`${styles.navItem} ${folderId === f.id ? styles.navActive : ""} ${dropTarget === f.id ? styles.dropTarget : ""}`}
                 onClick={() => goToFolder(f.id)}
+                {...folderDropProps(f.id)}
               >
                 <span className={styles.dot} />
                 <span className={styles.navLabel}>{f.name}</span>
@@ -369,6 +533,16 @@ export function Library(props: Props) {
             </div>
           ),
         )}
+        <button
+          type="button"
+          className={styles.themeToggle}
+          aria-pressed={dark}
+          aria-label="Toggle dark mode"
+          onClick={() => toggleDark(!dark)}
+        >
+          <span aria-hidden="true">{dark ? "☀" : "🌙"}</span>
+          Toggle dark mode
+        </button>
       </aside>
 
       <div className={styles.main}>
@@ -400,6 +574,7 @@ export function Library(props: Props) {
                   key={r.id}
                   className={styles.card}
                   onContextMenu={(e) => rewindMenu(e, r)}
+                  {...draggableProps(r)}
                 >
                   <Link href={`/r/${r.id}`} className={styles.cardLink}>
                     <div className={styles.thumb}>
@@ -445,6 +620,7 @@ export function Library(props: Props) {
                   className={styles.listRow}
                   role="row"
                   onContextMenu={(e) => rewindMenu(e, r)}
+                  {...draggableProps(r)}
                 >
                   <span className={styles.listCell} role="cell">
                     {rewindTitle(r, styles.listTitle)}
@@ -478,8 +654,9 @@ export function Library(props: Props) {
               {boardColumns(shownRewinds).map((c) => (
                 <section
                   key={c.status}
-                  className={styles.column}
+                  className={`${styles.column} ${columnDropTarget === c.status ? styles.columnDropTarget : ""}`}
                   aria-label={c.label}
+                  {...columnDropProps(c.status)}
                 >
                   <div className={styles.columnHead}>
                     <span
@@ -496,6 +673,7 @@ export function Library(props: Props) {
                       key={r.id}
                       className={styles.boardCard}
                       onContextMenu={(e) => rewindMenu(e, r)}
+                      {...draggableProps(r)}
                     >
                       {rewindTitle(r, styles.boardTitle)}
                       <div className={styles.boardUrl}>{r.url}</div>
@@ -534,6 +712,20 @@ export function Library(props: Props) {
         />
       )}
       <ToastStack toasts={toasts} onUndo={undo} onClose={close} />
+      {paletteOpen && (
+        <Palette
+          items={items}
+          query={query}
+          selected={selected}
+          onQueryChange={(q) => {
+            setQuery(q);
+            setSelected(0);
+          }}
+          onSelectedChange={setSelected}
+          onRun={runPaletteItem}
+          onClose={closePalette}
+        />
+      )}
     </div>
   );
 }
@@ -621,5 +813,104 @@ function InlineRename({ label, value, onDone, onCancel }: InlineRenameProps) {
       }}
       onBlur={() => finish(true)}
     />
+  );
+}
+
+const PALETTE_KIND_LABEL: Record<PaletteItem["kind"], string> = {
+  all: "Navigate",
+  folder: "Folder",
+  view: "View",
+  theme: "Appearance",
+  rewind: "Rewind",
+};
+
+function paletteItemKey(item: PaletteItem): string {
+  return item.kind === "all" || item.kind === "theme"
+    ? item.kind
+    : `${item.kind}-${item.id}`;
+}
+
+type PaletteProps = {
+  items: PaletteItem[];
+  query: string;
+  selected: number;
+  onQueryChange: (query: string) => void;
+  onSelectedChange: (index: number) => void;
+  onRun: (item: PaletteItem) => void;
+  onClose: () => void;
+};
+
+/** `⌘K` search: a filtered, arrow-navigable list of every jump target. */
+function Palette({
+  items,
+  query,
+  selected,
+  onQueryChange,
+  onSelectedChange,
+  onRun,
+  onClose,
+}: PaletteProps) {
+  const activeId =
+    items.length > 0
+      ? `palette-item-${paletteItemKey(items[selected])}`
+      : undefined;
+  return (
+    <>
+      <div className={styles.menuBackdrop} onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search or jump to…"
+        className={styles.palette}
+      >
+        <input
+          autoFocus
+          aria-label="Search or jump to…"
+          role="combobox"
+          aria-expanded="true"
+          aria-controls="palette-listbox"
+          aria-activedescendant={activeId}
+          className={styles.paletteInput}
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              onClose();
+            } else if (e.key === "ArrowDown") {
+              e.preventDefault();
+              if (items.length > 0)
+                onSelectedChange((selected + 1) % items.length);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              if (items.length > 0)
+                onSelectedChange((selected - 1 + items.length) % items.length);
+            } else if (e.key === "Enter") {
+              if (items[selected]) onRun(items[selected]);
+            }
+          }}
+        />
+        <div id="palette-listbox" role="listbox" className={styles.paletteList}>
+          {items.length === 0 && (
+            <div className={styles.paletteEmpty}>No results</div>
+          )}
+          {items.map((item, i) => (
+            <div
+              key={paletteItemKey(item)}
+              id={`palette-item-${paletteItemKey(item)}`}
+              role="option"
+              aria-selected={i === selected}
+              className={`${styles.paletteItem} ${i === selected ? styles.paletteActive : ""}`}
+              onMouseEnter={() => onSelectedChange(i)}
+              onClick={() => onRun(item)}
+            >
+              <span className={styles.paletteLabel}>{item.label}</span>
+              <span className={styles.paletteKind}>
+                {PALETTE_KIND_LABEL[item.kind]}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
