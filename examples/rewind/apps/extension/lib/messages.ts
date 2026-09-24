@@ -31,6 +31,7 @@ export type Message =
     } // popup -> background: opens the recorder window
   | { type: "recording"; tabId: number; since: number | null } // recorder -> background
   | { type: "select-area" } // background -> content: -> Rect | null
+  | { type: "area"; tabId: number } // recorder -> background: -> Rect | null
   | { type: "save-replay"; tabId: number }; // popup/command -> background
 
 export function send<T = unknown>(message: Message): Promise<T> {

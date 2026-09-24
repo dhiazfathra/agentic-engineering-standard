@@ -68,6 +68,7 @@ export type Message =
   | { type: "record"; tabId: number; mode: RecordMode; streamId?: string } // popup -> background: opens the recorder window
   | { type: "recording"; tabId: number; since: number | null } // recorder -> background: hold the buffer from `since`
   | { type: "select-area" } // background -> content: -> Rect | null
+  | { type: "area"; tabId: number } // recorder -> background: focuses the tab and relays select-area -> Rect | null
   | { type: "save-replay"; tabId: number }; // popup/command -> background
 ```
 
