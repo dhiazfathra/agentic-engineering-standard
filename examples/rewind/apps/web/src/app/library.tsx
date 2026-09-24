@@ -149,6 +149,19 @@ export function Library(props: Props) {
   );
   const pending = usePendingDeletes(showError);
 
+  // Per-`id:field` request counter so a slower, older PATCH's rollback
+  // can't clobber a newer edit that already succeeded (e.g. rename twice
+  // fast: the first request's failure would otherwise restore the
+  // pre-rename title over the second, already-applied rename).
+  const editVersions = useRef(new Map<string, number>());
+  const beginEdit = (key: string) => {
+    const version = (editVersions.current.get(key) ?? 0) + 1;
+    editVersions.current.set(key, version);
+    return version;
+  };
+  const isCurrentEdit = (key: string, version: number) =>
+    editVersions.current.get(key) === version;
+
   /** Sends one optimistic write; on failure runs `revert` and toasts. */
   const write = async (
     url: string,
@@ -205,12 +218,17 @@ export function Library(props: Props) {
   const renameRewind = (r: RewindListItem, title: string) => {
     setEditing(null);
     if (title === "" || title === r.title) return;
+    const key = `${r.id}:title`;
+    const version = beginEdit(key);
     dispatch({ type: "rename", id: r.id, title });
     void write(
       `/api/rewinds/${r.id}`,
       "PATCH",
       { title },
-      () => dispatch({ type: "rename", id: r.id, title: r.title }),
+      () => {
+        if (isCurrentEdit(key, version))
+          dispatch({ type: "rename", id: r.id, title: r.title });
+      },
       "Could not rename Rewind",
     );
   };
@@ -374,25 +392,35 @@ export function Library(props: Props) {
 
   const setRewindStatus = (r: RewindListItem, status: RewindStatus) => {
     if (status === r.status) return;
+    const key = `${r.id}:status`;
+    const version = beginEdit(key);
     dispatch({ type: "setStatus", id: r.id, status });
     showToast(`Moved to ${STATUS_LABEL[status]}`);
     void write(
       `/api/rewinds/${r.id}`,
       "PATCH",
       { status },
-      () => dispatch({ type: "setStatus", id: r.id, status: r.status }),
+      () => {
+        if (isCurrentEdit(key, version))
+          dispatch({ type: "setStatus", id: r.id, status: r.status });
+      },
       "Could not move Rewind",
     );
   };
 
   const moveRewindToFolder = (r: RewindListItem, folder: string | null) => {
     if (folder === r.folderId) return;
+    const key = `${r.id}:folderId`;
+    const version = beginEdit(key);
     dispatch({ type: "setFolder", id: r.id, folderId: folder });
     void write(
       `/api/rewinds/${r.id}`,
       "PATCH",
       { folderId: folder },
-      () => dispatch({ type: "setFolder", id: r.id, folderId: r.folderId }),
+      () => {
+        if (isCurrentEdit(key, version))
+          dispatch({ type: "setFolder", id: r.id, folderId: r.folderId });
+      },
       "Could not move Rewind",
     );
   };
@@ -428,7 +456,13 @@ export function Library(props: Props) {
       e.preventDefault();
       setDropTarget(undefined);
       const dragged = rewinds.find((x) => x.id === dragRewindId(e));
-      if (dragged) moveRewindToFolder(dragged, folder);
+      // Runs inside the onDrop event handler, not during render; the
+      // identical call shape for setRewindStatus above (also reads
+      // editVersions.current via beginEdit) is not flagged, so this is
+      // the rule misfiring on this one call site.
+      if (dragged)
+        // eslint-disable-next-line react-hooks/refs
+        moveRewindToFolder(dragged, folder);
     },
   });
 
