@@ -72,3 +72,12 @@ break when it hydrates:
   `toLocaleString()`) differ between the server (UTC on Vercel) and the
   browser. Render them in a `<time dateTime>` with
   `suppressHydrationWarning`, or format them after mount.
+
+## Drizzle
+
+- Drizzle's `sql` tag renders a column reference unqualified. In a
+  correlated subquery, `${events.rewindId} = ${rewinds.id}` becomes
+  `"rewindId" = "id"`, and `id` binds to the inner table's own column:
+  the count is silently 0. Write both sides qualified by hand
+  (`"events"."rewindId" = "rewinds"."id"`) and assert the value against
+  a real database, not a mocked `db`.
