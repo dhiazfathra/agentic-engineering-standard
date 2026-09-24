@@ -6,13 +6,13 @@ that run Node with `. ~/.nvm/nvm.sh && nvm use >/dev/null`.
 
 ## T1: `listRewinds` and `listFolders`
 
-- [ ] `src/lib/rewinds.ts` exports `listRewinds()`: every Rewind, newest
+- [x] `src/lib/rewinds.ts` exports `listRewinds()`: every Rewind, newest
       first, with `errorCount` (correlated count of its `isError`
       events), and `listFolders()`. A `ponytail:` comment names the
       no-pagination ceiling.
-- [ ] `GET /api/rewinds` and `GET /api/folders` call them; their tests
+- [x] `GET /api/rewinds` and `GET /api/folders` call them; their tests
       pass with only the mock target changed, plus `errorCount` asserted.
-- [ ] Unit tests for both helpers, including a Rewind with 0 errors.
+- [x] Unit tests for both helpers, including a Rewind with 0 errors.
 
 **Verification:** `bun run --filter web test` at 100%.
 **Dependencies:** None · **Files:** `src/lib/rewinds.ts`, its test, the
@@ -20,15 +20,15 @@ two routes and their tests · **Scope:** S
 
 ## T2: Pure helpers and reducer
 
-- [ ] `src/lib/library.ts`: `parseLibraryParams` (view default `grid`,
+- [x] `src/lib/library.ts`: `parseLibraryParams` (view default `grid`,
       folder optional), `filterByFolder`, `folderCounts`, `boardColumns`
       (four `STATUS_LABEL` columns), `nextFolderName` ("Untitled folder
       N"), `paletteItems(rewinds, folders, dark)` and
       `filterPalette(items, query)` (case-insensitive, 9 max).
-- [ ] `libraryReducer` with actions: rename, setStatus, setFolder,
+- [x] `libraryReducer` with actions: rename, setStatus, setFolder,
       removeRewind, restoreRewind, addFolder, renameFolder,
       removeFolder (unfiles its Rewinds), restoreFolder.
-- [ ] Every branch unit tested.
+- [x] Every branch unit tested.
 
 **Verification:** `bun run --filter web test` at 100%.
 **Dependencies:** None · **Files:** `src/lib/library.ts`,
@@ -36,7 +36,7 @@ two routes and their tests · **Scope:** S
 
 ### Checkpoint A (part 1)
 
-- [ ] `bun run test`, `lint`, `typecheck` exit 0; commit and push T1, T2
+- [x] `bun run test`, `lint`, `typecheck` exit 0; commit and push T1, T2
 
 ## T3: Page, shell, grid
 
@@ -58,8 +58,8 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ### Checkpoint A
 
-- [ ] `bun run test` at 100%, `lint`, `typecheck` exit 0
-- [ ] Commit and push
+- [x] `bun run test` at 100%, `lint`, `typecheck` exit 0
+- [x] Commit and push
 
 ## T4: List and board views
 
@@ -99,8 +99,8 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ### Checkpoint B
 
-- [ ] `bun run test` at 100%, `lint`, `typecheck` exit 0
-- [ ] Commit and push
+- [x] `bun run test` at 100%, `lint`, `typecheck` exit 0
+- [x] Commit and push
 
 ## T7: Drag and drop
 
@@ -161,6 +161,6 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ### Checkpoint: Complete
 
-- [ ] All seven success criteria in `SPEC-library.md` hold, with evidence
-- [ ] `/security-review`, `/performance`, `/documentation-and-adrs`
-- [ ] The learn skill updates `learning/`
+- [x] All seven success criteria in `SPEC-library.md` hold, with evidence
+- [x] `/security-review`, `/performance`, `/documentation-and-adrs`
+- [x] The learn skill updates `learning/`

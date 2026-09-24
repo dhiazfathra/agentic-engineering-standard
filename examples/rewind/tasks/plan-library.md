@@ -70,48 +70,48 @@ parallel.
 
 ### Phase 1: Data, logic, shell
 
-- [ ] T1: `listRewinds()` (with `errorCount`) and `listFolders()`
-- [ ] T2: pure helpers and reducer in `src/lib/library.ts`
-- [ ] T3: `/` page, `Library` shell (sidebar, header, grid), shared toast and copy link
+- [x] T1: `listRewinds()` (with `errorCount`) and `listFolders()`
+- [x] T2: pure helpers and reducer in `src/lib/library.ts`
+- [x] T3: `/` page, `Library` shell (sidebar, header, grid), shared toast and copy link
 
 ### Checkpoint A
 
-- [ ] `bun run test` at 100%, `lint`, `typecheck` exit 0
-- [ ] `/` shows the seeded Rewinds as cards; viewer tests still pass
-- [ ] Commit and push
+- [x] `bun run test` at 100%, `lint`, `typecheck` exit 0
+- [x] `/` shows the seeded Rewinds as cards; viewer tests still pass
+- [x] Commit and push
 
 ### Phase 2: Views and writes
 
-- [ ] T4: list and board views
-- [ ] T5: Rewind rename and delete with undo
-- [ ] T6: folders: create, rename, delete with undo, filter
+- [x] T4: list and board views
+- [x] T5: Rewind rename and delete with undo
+- [x] T6: folders: create, rename, delete with undo, filter
 
 ### Checkpoint B
 
-- [ ] `bun run test` at 100%, `lint`, `typecheck` exit 0
-- [ ] Commit and push
+- [x] `bun run test` at 100%, `lint`, `typecheck` exit 0
+- [x] Commit and push
 
 ### Phase 3: Movement and polish
 
-- [ ] T7: drag and drop, with the keyboard Move to and Set status
-- [ ] T8: `⌘K` palette
-- [ ] T9: dark mode
+- [x] T7: drag and drop, with the keyboard Move to and Set status
+- [x] T8: `⌘K` palette
+- [x] T9: dark mode
 
 ### Checkpoint C
 
-- [ ] `bun run test` at 100%, `lint`, `typecheck` exit 0
-- [ ] Commit and push
+- [x] `bun run test` at 100%, `lint`, `typecheck` exit 0
+- [x] Commit and push
 
 ### Phase 4: Proof
 
-- [ ] T10: `e2e/library.spec.ts`
-- [ ] T11: `docs/STACK.md`, `learning/`
+- [x] T10: `e2e/library.spec.ts`
+- [x] T11: `docs/STACK.md`, `learning/`
 
 ### Checkpoint: Complete
 
-- [ ] The seven success criteria in `SPEC-library.md` hold, with evidence
-- [ ] `/security-review`, `/performance`, `/documentation-and-adrs`
-- [ ] The learn skill updates `learning/`
+- [x] The seven success criteria in `SPEC-library.md` hold, with evidence
+- [x] `/security-review`, `/performance`, `/documentation-and-adrs`
+- [x] The learn skill updates `learning/`
 
 ## Risks and mitigations
 
@@ -129,3 +129,36 @@ parallel.
 
 All three spec questions were approved with their defaults on
 2026-09-24; see `SPEC-library.md`.
+
+## Finishing notes
+
+- Success criteria: `bun run --filter web test` 290 passed at 100%
+  coverage; `lint`, `typecheck` and `build` exit 0; the web e2e suite
+  (`e2e/library.spec.ts` covers criteria 1 to 6) passed 22/22 three times
+  in a row for the T10 worker and once more on a separate run of my own.
+  The extension e2e was not rerun: this module does not touch
+  `apps/extension`.
+- `/security-review` (by hand on `git diff main...HEAD`): no
+  high-confidence findings. The one `dangerouslySetInnerHTML` is the
+  constant `THEME_INIT_SCRIPT`. A dropped id is looked up in the loaded
+  Rewinds before any request, so dragged-in text from another page sends
+  nothing. Every write goes to a route that validates with the shared zod
+  schemas. Not fixed, recorded: anyone who can reach the app can rename,
+  re-status and delete any Rewind, because v1 has no auth (capability
+  map).
+- `/performance` (lab, `next start` on the seeded DB, this PC): `/` TTFB
+  4.5 to 6.8 ms over 5 requests, HTML 22 KB, 8 JS files totalling
+  184 KB as served (under the 300 KB budget). `listRewinds` is one query:
+  `EXPLAIN QUERY PLAN` shows the list scanning `rewinds_created_at_idx`
+  and the `errorCount` subquery using `events_rewind_id_idx`, so no N+1
+  and no full scan of `events`. Not fixed, recorded: no pagination and no
+  list virtualisation (spec decision 2); revisit past a few hundred
+  Rewinds.
+- `/documentation-and-adrs`: `docs/STACK.md` lists the page, the new
+  files and the e2e spec; `learning/MEMORY.md` records the module. No
+  ADR: the client-side pending-delete list is cheap to reverse (no schema
+  or API change) and is recorded in `SPEC-library.md`.
+- Deviations: T7, T8, T9 and the folder-flash fix landed in one commit
+  (`2e3c9cd`) instead of four. Creating a folder waits for the `POST`
+  instead of being optimistic. Context menus close on Escape and outside
+  click but have no arrow-key navigation.
