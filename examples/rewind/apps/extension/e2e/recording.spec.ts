@@ -33,8 +33,15 @@ test("desktop recording: records, stops and files a playable video", async () =>
 
     // Chrome auto-selects the fixture tab via
     // --auto-select-tab-capture-source-by-title, so no real picker appears.
-    // 3s countdown, then record for ~3s.
-    await recorder.waitForTimeout(3_000 + 3_000);
+    // Wait out the countdown for recording to start (the elapsed timer
+    // appears), then wait for it to read at least 3 seconds in.
+    const timer = recorder.getByText(/^\d+:\d{2}$/);
+    await timer.waitFor({ timeout: 15_000 });
+    await expect
+      .poll(async () => (await timer.textContent()) ?? "", {
+        timeout: 15_000,
+      })
+      .toMatch(/^0:0[3-9]$/);
 
     const [editor] = await Promise.all([
       context.waitForEvent("page", {

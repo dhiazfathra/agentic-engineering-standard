@@ -4,6 +4,7 @@ import {
   openFixture,
   sendToFixture,
   setSettings,
+  waitForBufferEvents,
   WEB_URL,
 } from "./fixtures";
 
@@ -16,7 +17,10 @@ test("screenshot: files a Rewind whose viewer shows the image, console and netwo
       openInNewTab: true,
     });
     const fixture = await openFixture(context);
-    await fixture.waitForTimeout(1000);
+    await waitForBufferEvents(context, extensionId, [
+      /fixture loaded/,
+      /\/api\/health/,
+    ]);
 
     const [editor] = await Promise.all([
       context.waitForEvent("page", {

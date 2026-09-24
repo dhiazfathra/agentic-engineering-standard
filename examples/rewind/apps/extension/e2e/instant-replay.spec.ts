@@ -4,6 +4,7 @@ import {
   openFixture,
   sendToFixture,
   setSettings,
+  waitForSnapshots,
   WEB_URL,
 } from "./fixtures";
 
@@ -18,7 +19,7 @@ test("instant replay: saves the last few seconds and files a playable video", as
     });
     const fixture = await openFixture(context);
     await fixture.bringToFront();
-    await fixture.waitForTimeout(4000);
+    await waitForSnapshots(context, extensionId, 3);
 
     const [editor] = await Promise.all([
       context.waitForEvent("page", {

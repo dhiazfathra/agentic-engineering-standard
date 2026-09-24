@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { BrowserContext, Page, Worker } from "@playwright/test";
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { WEB_URL } from "../playwright.config";
 
 // These run inside `worker.evaluate`/`page.evaluate`, in the extension's own
@@ -10,6 +10,9 @@ declare const chrome: {
     local: {
       get(key: string): Promise<Record<string, unknown>>;
       set(items: Record<string, unknown>): Promise<void>;
+    };
+    session: {
+      get(key: string): Promise<Record<string, unknown>>;
     };
   };
   tabs: { query(info: { url: string }): Promise<{ id: number }[]> };
@@ -102,6 +105,108 @@ export async function sendToFixture(
   );
   await helper.close();
   return result;
+}
+
+// The MV3 background service worker is torn down and respawned by the
+// browser whenever it's been idle, which invalidates any `Worker` handle
+// held across a multi-second poll ("Target page, context or browser has
+// been closed"). An extension page doesn't idle-terminate that way, so each
+// evaluate below opens a short-lived one instead of reusing `worker`.
+async function evalInExtension<T, Arg>(
+  context: BrowserContext,
+  extensionId: string,
+  fn: (arg: Arg) => T | Promise<T>,
+  arg: Arg,
+): Promise<T> {
+  const page = await context.newPage();
+  try {
+    await page.goto(`chrome-extension://${extensionId}/popup.html`);
+    // Playwright's `Unboxed<Arg>` check can't see through this generic
+    // wrapper; callers below pass plain JSON-serializable values.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await (page.evaluate as any)(fn, arg);
+  } finally {
+    await page.close();
+  }
+}
+
+/** The fixture tab's id, resolved via the extension's own `tabs.query`. */
+async function fixtureTabId(
+  context: BrowserContext,
+  extensionId: string,
+): Promise<number> {
+  const [tab] = await evalInExtension(
+    context,
+    extensionId,
+    () => chrome.tabs.query({ url: "http://localhost:3300/*" }),
+    undefined,
+  );
+  return (tab as { id: number }).id;
+}
+
+/** Polls the extension's `rewind`/`snapshots` IndexedDB store until the fixture tab has `min` snapshots. */
+export async function waitForSnapshots(
+  context: BrowserContext,
+  extensionId: string,
+  min: number,
+  timeout = 20_000,
+): Promise<void> {
+  const tabId = await fixtureTabId(context, extensionId);
+  await expect
+    .poll(
+      () =>
+        evalInExtension(
+          context,
+          extensionId,
+          (id) =>
+            new Promise<number>((resolve, reject) => {
+              const open = indexedDB.open("rewind", 1);
+              open.onerror = () => reject(open.error);
+              open.onsuccess = () => {
+                const req = open.result
+                  .transaction("snapshots", "readonly")
+                  .objectStore("snapshots")
+                  .getAll();
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => {
+                  const rows = req.result as { tabId: number }[];
+                  resolve(rows.filter((r) => r.tabId === id).length);
+                };
+              };
+            }),
+          tabId,
+        ),
+      { timeout },
+    )
+    .toBeGreaterThanOrEqual(min);
+}
+
+/** Polls `chrome.storage.session`'s debounced tab buffer until every pattern matches a captured event's text. */
+export async function waitForBufferEvents(
+  context: BrowserContext,
+  extensionId: string,
+  patterns: RegExp[],
+  timeout = 10_000,
+): Promise<void> {
+  const tabId = await fixtureTabId(context, extensionId);
+  await expect
+    .poll(
+      async () => {
+        const texts = await evalInExtension(
+          context,
+          extensionId,
+          async (id) => {
+            const stored = (await chrome.storage.session.get("buffer"))
+              .buffer as Record<number, { text: string }[]> | undefined;
+            return (stored?.[id] ?? []).map((e) => e.text);
+          },
+          tabId,
+        );
+        return patterns.every((p) => texts.some((t) => p.test(t)));
+      },
+      { timeout },
+    )
+    .toBe(true);
 }
 
 export { WEB_URL };
