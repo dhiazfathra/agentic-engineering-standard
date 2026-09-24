@@ -72,6 +72,10 @@ break when it hydrates:
   `toLocaleString()`) differ between the server (UTC on Vercel) and the
   browser. Render them in a `<time dateTime>` with
   `suppressHydrationWarning`, or format them after mount.
+- Browser-only state (`localStorage`, a class set on `<body>` by an
+  inline script) read in a `useState` initializer differs between the
+  server render and the first client render. Read it with
+  `useSyncExternalStore` and a server snapshot, or after mount.
 
 ## Drizzle
 
