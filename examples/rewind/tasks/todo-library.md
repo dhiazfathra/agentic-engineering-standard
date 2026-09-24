@@ -104,43 +104,43 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ## T7: Drag and drop
 
-- [ ] Board cards `draggable`; columns accept drops, send
+- [x] Board cards `draggable`; columns accept drops, send
       `PATCH { status }` and toast "Moved to <status>".
-- [ ] Any card drops on a sidebar folder (`PATCH { folderId }`) or on
+- [x] Any card drops on a sidebar folder (`PATCH { folderId }`) or on
       All Rewinds (`folderId: null`); the drop target highlights.
-- [ ] Context menu gains Move to folder and Set status, calling the
+- [x] Context menu gains Move to folder and Set status, calling the
       same handlers.
-- [ ] DOM tests through the handlers and the keyboard path; a
+- [x] DOM tests through the handlers and the keyboard path; a
       synthetic `drop` event with `dataTransfer` for the wiring.
 
 **Dependencies:** T4, T6 · **Scope:** M
 
 ## T8: `⌘K` palette
 
-- [ ] `⌘K`/`Ctrl+K` toggles, sidebar button opens, Escape and backdrop
+- [x] `⌘K`/`Ctrl+K` toggles, sidebar button opens, Escape and backdrop
       close. Input autofocused; items from `paletteItems`, filtered;
       arrows move the selection; Enter or click runs it; "No results".
-- [ ] `role="dialog"`, `aria-modal`, listbox with `aria-activedescendant`.
-- [ ] DOM tests: open both ways, filter, arrows, Enter on a Rewind
+- [x] `role="dialog"`, `aria-modal`, listbox with `aria-activedescendant`.
+- [x] DOM tests: open both ways, filter, arrows, Enter on a Rewind
       navigates, Enter on a view updates the URL, close.
 
 **Dependencies:** T3 · **Scope:** S
 
 ## T9: Dark mode
 
-- [ ] Inline script in `layout.tsx` sets `body.rw-dark` from
+- [x] Inline script in `layout.tsx` sets `body.rw-dark` from
       `localStorage` (`rewind-theme`) before paint, inside `try/catch`.
-- [ ] Sidebar toggle and palette item flip the class and the stored
+- [x] Sidebar toggle and palette item flip the class and the stored
       value.
-- [ ] Tests: layout renders the script; toggle writes both; blocked
+- [x] Tests: layout renders the script; toggle writes both; blocked
       storage still toggles for the session.
 
 **Dependencies:** T3, T8 · **Scope:** S
 
 ### Checkpoint C
 
-- [ ] `bun run test` at 100%, `lint`, `typecheck` exit 0
-- [ ] Commit and push
+- [x] `bun run test` at 100%, `lint`, `typecheck` exit 0
+- [x] Commit and push
 
 ## T10: E2E
 
