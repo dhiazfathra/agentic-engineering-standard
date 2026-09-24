@@ -610,6 +610,82 @@ describe("rename", () => {
     expect(container.textContent).toContain("Second");
     expect(container.textContent).not.toContain(TITLE);
   });
+
+  it("when both overlapping renames fail, it restores the last confirmed title, not the mid-flight one", async () => {
+    // Neither PATCH ever succeeds, so the rollback for the newer request
+    // ("Second") must restore the true last-server-confirmed title
+    // (the original), not "First" — the value on screen when "Second"'s
+    // edit began, which was itself only an unconfirmed optimistic write.
+    let resolveFirst!: (r: Response) => void;
+    let resolveSecond!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveFirst = r)),
+      )
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveSecond = r)),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mountOne();
+
+    type(startRename(), "First");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+
+    click(q('[aria-label="Actions for First"]'));
+    click(menuItem("Rename"));
+    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+    await flush();
+    expect(container.textContent).toContain("Second");
+
+    await act(async () => {
+      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.textContent).toContain(TITLE);
+    expect(container.textContent).not.toContain("First");
+    expect(container.textContent).not.toContain("Second");
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.textContent).toContain(TITLE);
+  });
+
+  it("an older successful rename does not clobber an already-confirmed newer one", async () => {
+    // "First" resolves after "Second" already succeeded and was recorded
+    // as the confirmed value; the stale success must not move the saved
+    // value backwards.
+    let resolveFirst!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveFirst = r)),
+      )
+      .mockImplementationOnce(() =>
+        Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mountOne();
+
+    type(startRename(), "First");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+
+    click(q('[aria-label="Actions for First"]'));
+    click(menuItem("Rename"));
+    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+    await flush();
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(container.textContent).toContain("Second");
+    expect(container.textContent).not.toContain("First");
+  });
 });
 
 function deleteFirst() {

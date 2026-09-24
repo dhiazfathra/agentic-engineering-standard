@@ -149,18 +149,33 @@ export function Library(props: Props) {
   );
   const pending = usePendingDeletes(showError);
 
-  // Per-`id:field` request counter so a slower, older PATCH's rollback
-  // can't clobber a newer edit that already succeeded (e.g. rename twice
-  // fast: the first request's failure would otherwise restore the
-  // pre-rename title over the second, already-applied rename).
-  const editVersions = useRef(new Map<string, number>());
-  const beginEdit = (key: string) => {
-    const version = (editVersions.current.get(key) ?? 0) + 1;
-    editVersions.current.set(key, version);
+  // Per-`id:field` edit tracking so a slower, older PATCH's failure can't
+  // clobber a newer edit: it must not fire its rollback at all while a
+  // newer request for the same field is still pending (`isCurrentEdit`
+  // false), and when it does roll back, it must restore the last value
+  // the server actually accepted (`savedValue`), not the value that was
+  // on screen when this edit started — that captured value can itself be
+  // an unconfirmed optimistic write from an even earlier edit.
+  type EditState = { version: number; saved: unknown; savedVersion: number };
+  const edits = useRef(new Map<string, EditState>());
+  const beginEdit = (key: string, current: unknown) => {
+    const prev = edits.current.get(key);
+    const version = (prev?.version ?? 0) + 1;
+    edits.current.set(key, {
+      version,
+      saved: prev ? prev.saved : current,
+      savedVersion: prev?.savedVersion ?? 0,
+    });
     return version;
   };
+  const markSaved = (key: string, version: number, value: unknown) => {
+    const s = edits.current.get(key);
+    if (s && version > s.savedVersion)
+      edits.current.set(key, { ...s, saved: value, savedVersion: version });
+  };
   const isCurrentEdit = (key: string, version: number) =>
-    editVersions.current.get(key) === version;
+    edits.current.get(key)?.version === version;
+  const savedValue = <T,>(key: string) => edits.current.get(key)!.saved as T;
 
   /** Sends one optimistic write; on failure runs `revert` and toasts. */
   const write = async (
@@ -219,7 +234,7 @@ export function Library(props: Props) {
     setEditing(null);
     if (title === "" || title === r.title) return;
     const key = `${r.id}:title`;
-    const version = beginEdit(key);
+    const version = beginEdit(key, r.title);
     dispatch({ type: "rename", id: r.id, title });
     void write(
       `/api/rewinds/${r.id}`,
@@ -227,10 +242,16 @@ export function Library(props: Props) {
       { title },
       () => {
         if (isCurrentEdit(key, version))
-          dispatch({ type: "rename", id: r.id, title: r.title });
+          dispatch({
+            type: "rename",
+            id: r.id,
+            title: savedValue<string>(key),
+          });
       },
       "Could not rename Rewind",
-    );
+    ).then((res) => {
+      if (res) markSaved(key, version, title);
+    });
   };
 
   const deleteRewind = (r: RewindListItem) => {
@@ -262,7 +283,7 @@ export function Library(props: Props) {
     setEditing(null);
     if (name === "" || name === f.name) return;
     const key = `${f.id}:name`;
-    const version = beginEdit(key);
+    const version = beginEdit(key, f.name);
     dispatch({ type: "renameFolder", id: f.id, name });
     void write(
       `/api/folders/${f.id}`,
@@ -270,10 +291,16 @@ export function Library(props: Props) {
       { name },
       () => {
         if (isCurrentEdit(key, version))
-          dispatch({ type: "renameFolder", id: f.id, name: f.name });
+          dispatch({
+            type: "renameFolder",
+            id: f.id,
+            name: savedValue<string>(key),
+          });
       },
       "Could not rename folder",
-    );
+    ).then((res) => {
+      if (res) markSaved(key, version, name);
+    });
   };
 
   const deleteFolder = (f: FolderListItem) => {
@@ -398,7 +425,7 @@ export function Library(props: Props) {
   const setRewindStatus = (r: RewindListItem, status: RewindStatus) => {
     if (status === r.status) return;
     const key = `${r.id}:status`;
-    const version = beginEdit(key);
+    const version = beginEdit(key, r.status);
     dispatch({ type: "setStatus", id: r.id, status });
     showToast(`Moved to ${STATUS_LABEL[status]}`);
     void write(
@@ -407,16 +434,22 @@ export function Library(props: Props) {
       { status },
       () => {
         if (isCurrentEdit(key, version))
-          dispatch({ type: "setStatus", id: r.id, status: r.status });
+          dispatch({
+            type: "setStatus",
+            id: r.id,
+            status: savedValue<RewindStatus>(key),
+          });
       },
       "Could not move Rewind",
-    );
+    ).then((res) => {
+      if (res) markSaved(key, version, status);
+    });
   };
 
   const moveRewindToFolder = (r: RewindListItem, folder: string | null) => {
     if (folder === r.folderId) return;
     const key = `${r.id}:folderId`;
-    const version = beginEdit(key);
+    const version = beginEdit(key, r.folderId);
     dispatch({ type: "setFolder", id: r.id, folderId: folder });
     void write(
       `/api/rewinds/${r.id}`,
@@ -424,10 +457,16 @@ export function Library(props: Props) {
       { folderId: folder },
       () => {
         if (isCurrentEdit(key, version))
-          dispatch({ type: "setFolder", id: r.id, folderId: r.folderId });
+          dispatch({
+            type: "setFolder",
+            id: r.id,
+            folderId: savedValue<string | null>(key),
+          });
       },
       "Could not move Rewind",
-    );
+    ).then((res) => {
+      if (res) markSaved(key, version, folder);
+    });
   };
 
   const dragRewindId = (e: ReactDragEvent) =>
