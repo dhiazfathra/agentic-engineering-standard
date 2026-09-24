@@ -576,88 +576,7 @@ describe("rename", () => {
     expect(container.textContent).toContain("Could not rename Rewind");
   });
 
-  it("an older failed rename does not roll back a newer successful one", async () => {
-    // First PATCH ("First") stays pending; second PATCH ("Second")
-    // resolves and succeeds first. When the first request then fails,
-    // its rollback must not clobber the already-applied second rename.
-    let resolveFirst!: (r: Response) => void;
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveFirst = r)),
-      )
-      .mockImplementationOnce(() =>
-        Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
-      );
-    vi.stubGlobal("fetch", fetchMock);
-    mountOne();
-
-    type(startRename(), "First");
-    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
-
-    click(q('[aria-label="Actions for First"]'));
-    click(menuItem("Rename"));
-    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
-    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
-    await flush();
-    expect(container.textContent).toContain("Second");
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(container.textContent).toContain("Second");
-    expect(container.textContent).not.toContain(TITLE);
-  });
-
-  it("when both overlapping renames fail, it restores the last confirmed title, not the mid-flight one", async () => {
-    // Neither PATCH ever succeeds, so the rollback for the newer request
-    // ("Second") must restore the true last-server-confirmed title
-    // (the original), not "First" — the value on screen when "Second"'s
-    // edit began, which was itself only an unconfirmed optimistic write.
-    let resolveFirst!: (r: Response) => void;
-    let resolveSecond!: (r: Response) => void;
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveFirst = r)),
-      )
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveSecond = r)),
-      );
-    vi.stubGlobal("fetch", fetchMock);
-    mountOne();
-
-    type(startRename(), "First");
-    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
-
-    click(q('[aria-label="Actions for First"]'));
-    click(menuItem("Rename"));
-    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
-    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
-    await flush();
-    expect(container.textContent).toContain("Second");
-
-    await act(async () => {
-      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    expect(container.textContent).toContain(TITLE);
-    expect(container.textContent).not.toContain("First");
-    expect(container.textContent).not.toContain("Second");
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    expect(container.textContent).toContain(TITLE);
-  });
-
-  it("an older successful rename does not clobber an already-confirmed newer one", async () => {
-    // "First" resolves after "Second" already succeeded and was recorded
-    // as the confirmed value; the stale success must not move the saved
-    // value backwards.
+  it("rename twice while first PATCH pending sends only one PATCH until first resolves", async () => {
     let resolveFirst!: (r: Response) => void;
     const fetchMock = vi
       .fn()
@@ -679,28 +598,31 @@ describe("rename", () => {
     key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
     await flush();
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Second");
+
     await act(async () => {
       resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
       await new Promise((r) => setTimeout(r, 0));
     });
-    expect(container.textContent).toContain("Second");
-    expect(container.textContent).not.toContain("First");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rewinds/seed-r1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Second" }),
+    });
   });
 
-  it("an older success after a newer rollback re-applies the confirmed value", async () => {
-    // "First" (v1) stays pending; "Second" (v2) fails first and rolls back
-    // to the last confirmed title. When "First" then succeeds, the screen
-    // must show "First" — not the rolled-back title left on screen by v2's
-    // failure — since the server now holds "First".
+  it("three rapid renames while first pending sends only two PATCHes with newest title", async () => {
     let resolveFirst!: (r: Response) => void;
-    let resolveSecond!: (r: Response) => void;
     const fetchMock = vi
       .fn()
       .mockImplementationOnce(
         () => new Promise<Response>((r) => (resolveFirst = r)),
       )
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveSecond = r)),
+      .mockImplementationOnce(() =>
+        Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
       );
     vi.stubGlobal("fetch", fetchMock);
     mountOne();
@@ -712,72 +634,77 @@ describe("rename", () => {
     click(menuItem("Rename"));
     type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
     key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
-    await flush();
-    expect(container.textContent).toContain("Second");
 
-    await act(async () => {
-      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    expect(container.textContent).toContain(TITLE);
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    expect(container.textContent).toContain("First");
-    expect(container.textContent).not.toContain(TITLE);
-    expect(container.textContent).not.toContain("Second");
-  });
-
-  it("each older success after a newer rollback keeps re-applying, in order", async () => {
-    // Three overlapping renames: v3 fails, then v1 succeeds, then v2
-    // succeeds. The screen must end on "Second" (v2), what the server holds.
-    let resolveFirst!: (r: Response) => void;
-    let resolveSecond!: (r: Response) => void;
-    let resolveThird!: (r: Response) => void;
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveFirst = r)),
-      )
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveSecond = r)),
-      )
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveThird = r)),
-      );
-    vi.stubGlobal("fetch", fetchMock);
-    mountOne();
-
-    type(startRename(), "First");
+    click(q('[aria-label="Actions for Second"]'));
+    click(menuItem("Rename"));
+    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Third");
     key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
-    for (const [from, to] of [
-      ["First", "Second"],
-      ["Second", "Third"],
-    ]) {
-      click(q(`[aria-label="Actions for ${from}"]`));
-      click(menuItem("Rename"));
-      type(q('input[aria-label="Rewind title"]') as HTMLInputElement, to);
-      key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
-    }
     await flush();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Third");
 
-    const settle = async (resolve: (r: Response) => void, status: number) =>
-      act(async () => {
-        resolve(new Response(JSON.stringify({}), { status }));
-        await new Promise((r) => setTimeout(r, 0));
-      });
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    await settle(resolveThird, 500);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rewinds/seed-r1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Third" }),
+    });
+    expect(container.textContent).toContain("Third");
+  });
+
+  it("a failed PATCH with nothing queued rolls back and toasts", async () => {
+    stubFetch(false);
+    mountOne();
+    const input = startRename();
+    type(input, "Doomed");
+    key(input, "Enter");
+    await flush();
     expect(container.textContent).toContain(TITLE);
-    await settle(resolveFirst, 200);
-    expect(container.textContent).toContain("First");
-    await settle(resolveSecond, 200);
+    expect(container.textContent).not.toContain("Doomed");
+    expect(container.textContent).toContain("Could not rename Rewind");
+  });
+
+  it("first PATCH fails while newer rename queued: no rollback, then sends newest", async () => {
+    let resolveFirst!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveFirst = r)),
+      )
+      .mockImplementationOnce(() =>
+        Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mountOne();
+
+    type(startRename(), "First");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+
+    click(q('[aria-label="Actions for First"]'));
+    click(menuItem("Rename"));
+    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+    await flush();
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
     expect(container.textContent).toContain("Second");
-    expect(container.textContent).not.toContain("First");
-    expect(container.textContent).not.toContain("Third");
+    expect(container.textContent).not.toContain(TITLE);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rewinds/seed-r1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Second" }),
+    });
   });
 });
 
@@ -1065,83 +992,6 @@ describe("folders", () => {
     expect(container.textContent).toContain("Could not rename folder");
   });
 
-  it("an older failed rename does not roll back a newer successful one", async () => {
-    let resolveFirst!: (r: Response) => void;
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockImplementationOnce(
-          () => new Promise<Response>((r) => (resolveFirst = r)),
-        )
-        .mockImplementationOnce(() =>
-          Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
-        ),
-    );
-    mountFolders();
-
-    let input = renameFolderInput();
-    type(input, "First");
-    key(input, "Enter");
-    click(q('[aria-label="Actions for folder First"]'));
-    click(menuItem("Rename"));
-    input = q('input[aria-label="Folder name"]') as HTMLInputElement;
-    type(input, "Second");
-    key(input, "Enter");
-    await flush();
-    expect(container.textContent).toContain("Second");
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(container.textContent).toContain("Second");
-    expect(container.textContent).not.toContain("Checkout bugs");
-  });
-
-  it("an older success after a newer rollback re-applies the confirmed name", async () => {
-    let resolveFirst!: (r: Response) => void;
-    let resolveSecond!: (r: Response) => void;
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockImplementationOnce(
-          () => new Promise<Response>((r) => (resolveFirst = r)),
-        )
-        .mockImplementationOnce(
-          () => new Promise<Response>((r) => (resolveSecond = r)),
-        ),
-    );
-    mountFolders();
-
-    let input = renameFolderInput();
-    type(input, "First");
-    key(input, "Enter");
-    click(q('[aria-label="Actions for folder First"]'));
-    click(menuItem("Rename"));
-    input = q('input[aria-label="Folder name"]') as HTMLInputElement;
-    type(input, "Second");
-    key(input, "Enter");
-    await flush();
-    expect(container.textContent).toContain("Second");
-
-    await act(async () => {
-      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    expect(container.textContent).toContain("Checkout bugs");
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    expect(container.textContent).toContain("First");
-    expect(container.textContent).not.toContain("Checkout bugs");
-    expect(container.textContent).not.toContain("Second");
-  });
-
   function deleteFolder() {
     click(q('[aria-label="Actions for folder Checkout bugs"]'));
     click(menuItem("Delete folder"));
@@ -1334,73 +1184,14 @@ describe("drag and drop", () => {
     expect(container.textContent).toContain("Could not move Rewind");
   });
 
-  it("an older failed status change does not roll back a newer one", async () => {
-    // First drop (triage) stays pending; second drop (done) resolves
-    // and succeeds first. When the first request then fails, its
-    // rollback must not move the card back out of "done".
-    let resolveFirst!: (r: Response) => void;
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveFirst = r)),
-      )
-      .mockImplementationOnce(() =>
-        Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
-      );
-    vi.stubGlobal("fetch", fetchMock);
+  it("a failed status change with nothing queued rolls back and toasts", async () => {
+    stubFetch(false);
     mountBoard();
-
     drop(qAll("section")[1], "a");
-    drop(qAll("section")[3], "a");
     await flush();
-    expect(qAll("section")[3].textContent).toContain(TITLE);
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(qAll("section")[3].textContent).toContain(TITLE);
-    expect(qAll("section")[0].textContent).not.toContain(TITLE);
-  });
-
-  it("an older status success after a newer rollback re-applies the confirmed status", async () => {
-    // First drop (triage) stays pending; second drop (done) fails first
-    // and rolls back to "new". When the first drop then succeeds, the
-    // card must land in "triage" — the server-confirmed status — not stay
-    // on the rolled-back "new" column.
-    let resolveFirst!: (r: Response) => void;
-    let resolveSecond!: (r: Response) => void;
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn()
-        .mockImplementationOnce(
-          () => new Promise<Response>((r) => (resolveFirst = r)),
-        )
-        .mockImplementationOnce(
-          () => new Promise<Response>((r) => (resolveSecond = r)),
-        ),
-    );
-    mountBoard();
-
-    drop(qAll("section")[1], "a");
-    drop(qAll("section")[3], "a");
-    await flush();
-
-    await act(async () => {
-      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
     expect(qAll("section")[0].textContent).toContain(TITLE);
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-    expect(qAll("section")[1].textContent).toContain(TITLE);
-    expect(qAll("section")[0].textContent).not.toContain(TITLE);
-    expect(qAll("section")[3].textContent).not.toContain(TITLE);
+    expect(qAll("section")[1].textContent).not.toContain(TITLE);
+    expect(container.textContent).toContain("Could not move Rewind");
   });
 
   it("dropping a card on a sidebar folder sends PATCH folderId", async () => {
@@ -1576,103 +1367,24 @@ describe("drag and drop", () => {
     await flush();
   });
 
-  it("an older failed folder move does not roll back a newer one", async () => {
-    // First move (to f1) stays pending; second move (to f2) resolves
-    // and succeeds first. When the first request then fails, its
-    // rollback must not move the Rewind back to its original folder
-    // (null). We assert this indirectly through the product's existing
-    // "same folder" guard: once folderId is genuinely f2, moving to f2
-    // again is a no-op and sends no request.
-    let resolveFirst!: (r: Response) => void;
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveFirst = r)),
-      )
-      .mockImplementationOnce(() =>
-        Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
-      );
+  it("a failed folder move with nothing queued rolls back and toasts", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify({}), { status: 500 })),
+    );
     vi.stubGlobal("fetch", fetchMock);
     mount(
       <Library
         rewinds={[rewind({ id: "a", folderId: null })]}
-        folders={[
-          folder({ id: "f1", name: "Checkout bugs" }),
-          folder({ id: "f2", name: "Other" }),
-        ]}
+        folders={[folder({ id: "f1", name: "Unique" })]}
         view="grid"
         folderId={undefined}
       />,
     );
-
     click(q(`[aria-label="Actions for ${TITLE}"]`));
-    click(menuItem("Move to Checkout bugs"));
-    click(q(`[aria-label="Actions for ${TITLE}"]`));
-    click(menuItem("Move to Other"));
+    click(menuItem("Move to Unique"));
     await flush();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    click(q(`[aria-label="Actions for ${TITLE}"]`));
-    click(menuItem("Move to Other"));
-    await flush();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Could not move Rewind");
-  });
-
-  it("an older folder-move success after a newer rollback re-applies the confirmed folder", async () => {
-    // Move to f1 (v1) stays pending; move to f2 (v2) fails first and
-    // rolls back to the original folder (null). When the move to f1
-    // then succeeds, the Rewind must end up in f1 — asserted indirectly
-    // through the "same folder" no-op guard, as above.
-    let resolveFirst!: (r: Response) => void;
-    let resolveSecond!: (r: Response) => void;
-    const fetchMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveFirst = r)),
-      )
-      .mockImplementationOnce(
-        () => new Promise<Response>((r) => (resolveSecond = r)),
-      );
-    vi.stubGlobal("fetch", fetchMock);
-    mount(
-      <Library
-        rewinds={[rewind({ id: "a", folderId: null })]}
-        folders={[
-          folder({ id: "f1", name: "Checkout bugs" }),
-          folder({ id: "f2", name: "Other" }),
-        ]}
-        view="grid"
-        folderId={undefined}
-      />,
-    );
-
-    click(q(`[aria-label="Actions for ${TITLE}"]`));
-    click(menuItem("Move to Checkout bugs"));
-    click(q(`[aria-label="Actions for ${TITLE}"]`));
-    click(menuItem("Move to Other"));
-    await flush();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    await act(async () => {
-      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    click(q(`[aria-label="Actions for ${TITLE}"]`));
-    click(menuItem("Move to Checkout bugs"));
-    await flush();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("onDragOver over a column and a folder prevents the default", () => {

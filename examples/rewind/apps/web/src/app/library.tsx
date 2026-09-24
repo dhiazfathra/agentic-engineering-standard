@@ -149,62 +149,41 @@ export function Library(props: Props) {
   );
   const pending = usePendingDeletes(showError);
 
-  // Per-`id:field` edit tracking so a slower, older PATCH's failure can't
-  // clobber a newer edit: it must not fire its rollback at all while a
-  // newer request for the same field is still pending (`isCurrentEdit`
-  // false), and when it does roll back, it must restore the last value
-  // the server actually accepted (`savedValue`), not the value that was
-  // on screen when this edit started — that captured value can itself be
-  // an unconfirmed optimistic write from an even earlier edit. A rollback
-  // can also fire before an *older*, still-pending edit's success lands
-  // (`rolledBack`): if that success is left to just update `saved`, the
-  // screen stays on the rolled-back value while the server holds the
-  // newer one. `markSaved` re-dispatches in that case, unless a newer
-  // edit has since begun and reset `rolledBack` to false.
-  type EditState = {
-    version: number;
-    saved: unknown;
-    savedVersion: number;
-    rolledBack: boolean;
-  };
-  const edits = useRef(new Map<string, EditState>());
-  const beginEdit = (key: string, current: unknown) => {
-    const prev = edits.current.get(key);
-    const version = (prev?.version ?? 0) + 1;
-    edits.current.set(key, {
-      version,
-      saved: prev ? prev.saved : current,
-      savedVersion: prev?.savedVersion ?? 0,
-      rolledBack: false,
-    });
-    return version;
-  };
-  /** Runs `apply` and flags the edit as rolled back, but only while it's
-   * still the current edit for `key` — an older edit's failure must not
-   * clobber a newer one that's still pending. */
-  const rollbackEdit = (key: string, version: number, apply: () => void) => {
-    if (!isCurrentEdit(key, version)) return;
-    // isCurrentEdit is true, so the entry for `key` is guaranteed to exist.
-    edits.current.set(key, { ...edits.current.get(key)!, rolledBack: true });
-    apply();
-  };
-  /** Records the server-accepted value, then, if a rollback fired for an
-   * older edit while this one was still in flight, re-applies it so the
-   * screen matches what the server actually holds. */
-  const markSaved = <T,>(
+  // The server PATCH for a field overwrites it blindly, so two requests for
+  // the same `id:field` key must never be in flight together — whichever
+  // lands second would stomp the first even if it started earlier. This
+  // queue keeps at most one PATCH per key in flight and coalesces every
+  // edit made in the meantime into the single newest value to send next.
+  type SaveEntry = { confirmed: unknown; sending: boolean; queued?: unknown };
+  const saves = useRef(new Map<string, SaveEntry>());
+  const queueWrite = <T,>(
     key: string,
-    version: number,
+    previous: T,
     value: T,
-    reapply: (value: T) => void,
+    send: (value: T) => Promise<Response | undefined>,
+    apply: (value: T) => void,
   ) => {
-    const s = edits.current.get(key);
-    if (!s || version <= s.savedVersion) return;
-    edits.current.set(key, { ...s, saved: value, savedVersion: version });
-    if (s.rolledBack) reapply(value);
+    const entry = saves.current.get(key) ?? {
+      confirmed: previous,
+      sending: false,
+    };
+    saves.current.set(key, entry);
+    if (entry.sending) {
+      entry.queued = value;
+      return;
+    }
+    entry.sending = true;
+    void send(value).then((res) => {
+      if (res) entry.confirmed = value;
+      else if (entry.queued === undefined) apply(entry.confirmed as T);
+      entry.sending = false;
+      const next = entry.queued;
+      if (next !== undefined) {
+        entry.queued = undefined;
+        queueWrite(key, entry.confirmed as T, next as T, send, apply);
+      }
+    });
   };
-  const isCurrentEdit = (key: string, version: number) =>
-    edits.current.get(key)?.version === version;
-  const savedValue = <T,>(key: string) => edits.current.get(key)!.saved as T;
 
   /** Sends one optimistic write; on failure runs `revert` and toasts. */
   const write = async (
@@ -262,28 +241,21 @@ export function Library(props: Props) {
   const renameRewind = (r: RewindListItem, title: string) => {
     setEditing(null);
     if (title === "" || title === r.title) return;
-    const key = `${r.id}:title`;
-    const version = beginEdit(key, r.title);
     dispatch({ type: "rename", id: r.id, title });
-    void write(
-      `/api/rewinds/${r.id}`,
-      "PATCH",
-      { title },
-      () =>
-        rollbackEdit(key, version, () =>
-          dispatch({
-            type: "rename",
-            id: r.id,
-            title: savedValue<string>(key),
-          }),
+    queueWrite(
+      `${r.id}:title`,
+      r.title,
+      title,
+      (title) =>
+        write(
+          `/api/rewinds/${r.id}`,
+          "PATCH",
+          { title },
+          () => {},
+          "Could not rename Rewind",
         ),
-      "Could not rename Rewind",
-    ).then((res) => {
-      if (res)
-        markSaved(key, version, title, (title) =>
-          dispatch({ type: "rename", id: r.id, title }),
-        );
-    });
+      (title) => dispatch({ type: "rename", id: r.id, title }),
+    );
   };
 
   const deleteRewind = (r: RewindListItem) => {
@@ -314,28 +286,21 @@ export function Library(props: Props) {
   const renameFolder = (f: FolderListItem, name: string) => {
     setEditing(null);
     if (name === "" || name === f.name) return;
-    const key = `${f.id}:name`;
-    const version = beginEdit(key, f.name);
     dispatch({ type: "renameFolder", id: f.id, name });
-    void write(
-      `/api/folders/${f.id}`,
-      "PATCH",
-      { name },
-      () =>
-        rollbackEdit(key, version, () =>
-          dispatch({
-            type: "renameFolder",
-            id: f.id,
-            name: savedValue<string>(key),
-          }),
+    queueWrite(
+      `${f.id}:name`,
+      f.name,
+      name,
+      (name) =>
+        write(
+          `/api/folders/${f.id}`,
+          "PATCH",
+          { name },
+          () => {},
+          "Could not rename folder",
         ),
-      "Could not rename folder",
-    ).then((res) => {
-      if (res)
-        markSaved(key, version, name, (name) =>
-          dispatch({ type: "renameFolder", id: f.id, name }),
-        );
-    });
+      (name) => dispatch({ type: "renameFolder", id: f.id, name }),
+    );
   };
 
   const deleteFolder = (f: FolderListItem) => {
@@ -459,55 +424,41 @@ export function Library(props: Props) {
 
   const setRewindStatus = (r: RewindListItem, status: RewindStatus) => {
     if (status === r.status) return;
-    const key = `${r.id}:status`;
-    const version = beginEdit(key, r.status);
     dispatch({ type: "setStatus", id: r.id, status });
     showToast(`Moved to ${STATUS_LABEL[status]}`);
-    void write(
-      `/api/rewinds/${r.id}`,
-      "PATCH",
-      { status },
-      () =>
-        rollbackEdit(key, version, () =>
-          dispatch({
-            type: "setStatus",
-            id: r.id,
-            status: savedValue<RewindStatus>(key),
-          }),
+    queueWrite(
+      `${r.id}:status`,
+      r.status,
+      status,
+      (status) =>
+        write(
+          `/api/rewinds/${r.id}`,
+          "PATCH",
+          { status },
+          () => {},
+          "Could not move Rewind",
         ),
-      "Could not move Rewind",
-    ).then((res) => {
-      if (res)
-        markSaved(key, version, status, (status) =>
-          dispatch({ type: "setStatus", id: r.id, status }),
-        );
-    });
+      (status) => dispatch({ type: "setStatus", id: r.id, status }),
+    );
   };
 
   const moveRewindToFolder = (r: RewindListItem, folder: string | null) => {
     if (folder === r.folderId) return;
-    const key = `${r.id}:folderId`;
-    const version = beginEdit(key, r.folderId);
     dispatch({ type: "setFolder", id: r.id, folderId: folder });
-    void write(
-      `/api/rewinds/${r.id}`,
-      "PATCH",
-      { folderId: folder },
-      () =>
-        rollbackEdit(key, version, () =>
-          dispatch({
-            type: "setFolder",
-            id: r.id,
-            folderId: savedValue<string | null>(key),
-          }),
+    queueWrite(
+      `${r.id}:folderId`,
+      r.folderId,
+      folder,
+      (folderId) =>
+        write(
+          `/api/rewinds/${r.id}`,
+          "PATCH",
+          { folderId },
+          () => {},
+          "Could not move Rewind",
         ),
-      "Could not move Rewind",
-    ).then((res) => {
-      if (res)
-        markSaved(key, version, folder, (folderId) =>
-          dispatch({ type: "setFolder", id: r.id, folderId }),
-        );
-    });
+      (folderId) => dispatch({ type: "setFolder", id: r.id, folderId }),
+    );
   };
 
   const dragRewindId = (e: ReactDragEvent) =>
@@ -541,13 +492,9 @@ export function Library(props: Props) {
       e.preventDefault();
       setDropTarget(undefined);
       const dragged = rewinds.find((x) => x.id === dragRewindId(e));
-      // Runs inside the onDrop event handler, not during render; the
-      // identical call shape for setRewindStatus above (also reads
-      // edits.current via beginEdit) is not flagged, so this is
-      // the rule misfiring on this one call site.
-      if (dragged)
-        // eslint-disable-next-line react-hooks/refs
-        moveRewindToFolder(dragged, folder);
+      // Event handler, not render: queueWrite reads saves.current only when called.
+      // eslint-disable-next-line react-hooks/refs
+      if (dragged) moveRewindToFolder(dragged, folder);
     },
   });
 
