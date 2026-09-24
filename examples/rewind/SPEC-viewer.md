@@ -70,7 +70,9 @@ design's `markers`.
   Posting sends `POST /api/rewinds/[id]/comments` with an author name the
   viewer types once; the browser remembers it (v1 has no accounts). The
   new comment appears in the list and on the timeline without a reload.
-- **Status.** The select sends `PATCH /api/rewinds/[id]` with `status`.
+- **Status.** The select sends `PATCH /api/rewinds/[id]` with `status`
+  and stays disabled until the response arrives. A failed request reverts
+  the select to its previous value and shows an error toast.
 - **Copy link.** Writes `<origin>/r/<id>` to the clipboard and shows a
   "Link copied" toast.
 - **Not found.** An unknown id renders Next's 404.
