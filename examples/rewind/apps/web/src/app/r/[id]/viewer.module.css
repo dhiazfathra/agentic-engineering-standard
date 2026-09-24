@@ -635,20 +635,3 @@
   border-color: var(--rw-accent);
 }
 
-.toast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--rw-ink);
-  color: var(--rw-surface);
-  padding: 10px 16px;
-  border-radius: 9px;
-  font-size: 13px;
-  box-shadow: var(--rw-pop);
-  z-index: 10;
-}
-
-.toast.error {
-  background: var(--rw-err);
-}
