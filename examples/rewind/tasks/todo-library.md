@@ -63,10 +63,10 @@ cards. **Dependencies:** T1, T2 · **Scope:** M
 
 ## T4: List and board views
 
-- [ ] List per `is.list`: Title, Page, Reporter, Length, Status, copy.
-- [ ] Board per `is.board`: four columns with counts, cards with error
+- [x] List per `is.list`: Title, Page, Reporter, Length, Status, copy.
+- [x] Board per `is.board`: four columns with counts, cards with error
       label when `errorCount > 0`, "Drop Rewinds here" when empty.
-- [ ] DOM tests for both views and the empty column.
+- [x] DOM tests for both views and the empty column.
 
 **Dependencies:** T3 · **Scope:** S
 

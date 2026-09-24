@@ -6,7 +6,12 @@ import { useMemo } from "react";
 import type { RewindStatus } from "@rewind/schema";
 import { ToastStack, useToast } from "@/components/toast";
 import { copyRewindLink } from "@/lib/copy-link";
-import { filterByFolder, folderCounts, type LibraryView } from "@/lib/library";
+import {
+  boardColumns,
+  filterByFolder,
+  folderCounts,
+  type LibraryView,
+} from "@/lib/library";
 import type { FolderListItem, RewindListItem } from "@/lib/rewinds";
 import {
   formatTime,
@@ -29,6 +34,26 @@ const VIEWS: { key: LibraryView; label: string }[] = [
   { key: "board", label: "Board" },
   { key: "list", label: "List" },
 ];
+
+/** Board column dot colours, from the design's `COLS`. */
+const COLUMN_COLOR: Record<RewindStatus, string> = {
+  new: "#3538cd",
+  triage: "#a65f00",
+  progress: "#e65100",
+  done: "#248a3d",
+};
+
+function duration(r: RewindListItem): string {
+  return r.durationSeconds ? formatTime(r.durationSeconds) : "—";
+}
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <span className={styles.avatar} style={{ background: personColor(name) }}>
+      {initials(name)}
+    </span>
+  );
+}
 
 /** Builds `/?view=&folder=`, dropping each param at its default. */
 function libraryUrl(view: LibraryView, folderId: string | undefined): string {
@@ -62,6 +87,17 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
   const goToView = (next: LibraryView) => {
     router.replace(libraryUrl(next, folderId));
   };
+
+  const copyButton = (id: string) => (
+    <button
+      type="button"
+      className={styles.copyButton}
+      aria-label="Copy link"
+      onClick={() => void copyLink(id)}
+    >
+      Copy link
+    </button>
+  );
 
   const copyLink = async (id: string) => {
     try {
@@ -123,49 +159,122 @@ export function Library({ rewinds, folders, view, folderId }: Props) {
         </header>
 
         <div className={styles.body}>
-          {/* T4 builds list and board; for now every view renders the grid. */}
-          <div className={styles.grid}>
-            {shownRewinds.map((r) => (
-              <div key={r.id} className={styles.card}>
-                <Link href={`/r/${r.id}`} className={styles.cardLink}>
-                  <div className={styles.thumb}>
-                    <span className={styles.duration}>
-                      {r.durationSeconds ? formatTime(r.durationSeconds) : "—"}
-                    </span>
-                  </div>
-                  <div className={styles.cardTitle}>{r.title}</div>
-                  <div className={styles.cardMeta}>
-                    <span
-                      className={styles.avatar}
-                      style={{ background: personColor(r.reporterName) }}
-                    >
-                      {initials(r.reporterName)}
-                    </span>
-                    <span className={styles.metaText}>
-                      {r.url} ·{" "}
-                      <time
-                        dateTime={r.createdAt.toISOString()}
-                        suppressHydrationWarning
-                      >
-                        {timeAgo(r.createdAt)}
-                      </time>
-                    </span>
+          {view === "grid" && (
+            <div className={styles.grid}>
+              {shownRewinds.map((r) => (
+                <div key={r.id} className={styles.card}>
+                  <Link href={`/r/${r.id}`} className={styles.cardLink}>
+                    <div className={styles.thumb}>
+                      <span className={styles.duration}>{duration(r)}</span>
+                    </div>
+                    <div className={styles.cardTitle}>{r.title}</div>
+                    <div className={styles.cardMeta}>
+                      <Avatar name={r.reporterName} />
+                      <span className={styles.metaText}>
+                        {r.url} ·{" "}
+                        <time
+                          dateTime={r.createdAt.toISOString()}
+                          suppressHydrationWarning
+                        >
+                          {timeAgo(r.createdAt)}
+                        </time>
+                      </span>
+                      <span className={styles.status}>
+                        {STATUS_LABEL[r.status as RewindStatus]}
+                      </span>
+                    </div>
+                  </Link>
+                  {copyButton(r.id)}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view === "list" && (
+            <div className={styles.list} role="table">
+              <div className={styles.listHead} role="row">
+                <span role="columnheader">Title</span>
+                <span role="columnheader">Page</span>
+                <span role="columnheader">Reporter</span>
+                <span role="columnheader">Length</span>
+                <span role="columnheader">Status</span>
+                <span role="columnheader" />
+              </div>
+              {shownRewinds.map((r) => (
+                <div key={r.id} className={styles.listRow} role="row">
+                  <Link
+                    href={`/r/${r.id}`}
+                    className={styles.listTitle}
+                    role="cell"
+                  >
+                    {r.title}
+                  </Link>
+                  <span className={styles.listMuted} role="cell">
+                    {r.url}
+                  </span>
+                  <span className={styles.listReporter} role="cell">
+                    <Avatar name={r.reporterName} />
+                    {r.reporterName}
+                  </span>
+                  <span className={styles.listMuted} role="cell">
+                    {duration(r)}
+                  </span>
+                  <span role="cell">
                     <span className={styles.status}>
                       {STATUS_LABEL[r.status as RewindStatus]}
                     </span>
-                  </div>
-                </Link>
-                <button
-                  type="button"
-                  className={styles.copyButton}
-                  aria-label="Copy link"
-                  onClick={() => void copyLink(r.id)}
+                  </span>
+                  <span role="cell">{copyButton(r.id)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {view === "board" && (
+            <div className={styles.board}>
+              {boardColumns(shownRewinds).map((c) => (
+                <section
+                  key={c.status}
+                  className={styles.column}
+                  aria-label={c.label}
                 >
-                  Copy link
-                </button>
-              </div>
-            ))}
-          </div>
+                  <div className={styles.columnHead}>
+                    <span
+                      className={styles.columnDot}
+                      style={{ background: COLUMN_COLOR[c.status] }}
+                    />
+                    {c.label}
+                    <span className={styles.columnCount}>
+                      {c.rewinds.length}
+                    </span>
+                  </div>
+                  {c.rewinds.map((r) => (
+                    <div key={r.id} className={styles.boardCard}>
+                      <Link href={`/r/${r.id}`} className={styles.boardTitle}>
+                        {r.title}
+                      </Link>
+                      <div className={styles.boardUrl}>{r.url}</div>
+                      <div className={styles.boardMeta}>
+                        <Avatar name={r.reporterName} />
+                        <span>{duration(r)}</span>
+                        <span className={styles.spacer} />
+                        {r.errorCount > 0 && (
+                          <span className={styles.errors}>
+                            {r.errorCount}{" "}
+                            {r.errorCount === 1 ? "error" : "errors"}
+                          </span>
+                        )}
+                        {copyButton(r.id)}
+                      </div>
+                    </div>
+                  ))}
+                  {c.rewinds.length === 0 && (
+                    <div className={styles.emptyColumn}>Drop Rewinds here</div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

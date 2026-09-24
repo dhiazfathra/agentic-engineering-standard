@@ -271,3 +271,66 @@ describe("copy link", () => {
     expect(container.textContent).toContain("Could not copy link");
   });
 });
+
+describe("list view", () => {
+  it("renders a row per Rewind with the design's columns", () => {
+    mount(
+      <Library
+        rewinds={[rewind(), rewind({ id: "shot", durationSeconds: null })]}
+        folders={[]}
+        view="list"
+        folderId={undefined}
+      />,
+    );
+    const heads = qAll('[role="columnheader"]').map((h) => h.textContent);
+    expect(heads).toEqual([
+      "Title",
+      "Page",
+      "Reporter",
+      "Length",
+      "Status",
+      "",
+    ]);
+    expect(qAll('[role="row"]')).toHaveLength(3);
+    expect(q('a[href="/r/seed-r1"]').textContent).toBe(
+      "Checkout fails after applying coupon",
+    );
+    expect(container.textContent).toContain("Maya Chen");
+    expect(container.textContent).toContain("0:42");
+    expect(container.textContent).toContain("—");
+    expect(container.textContent).toContain("New");
+    expect(qAll('[aria-label="Copy link"]')).toHaveLength(2);
+  });
+});
+
+describe("board view", () => {
+  it("renders four columns with counts, error labels and empty drop zones", () => {
+    mount(
+      <Library
+        rewinds={[
+          rewind({ id: "a", errorCount: 3 }),
+          rewind({ id: "b", errorCount: 1 }),
+          rewind({ id: "c", status: "done", durationSeconds: null }),
+        ]}
+        folders={[]}
+        view="board"
+        folderId={undefined}
+      />,
+    );
+    const cols = qAll("section");
+    expect(cols.map((c) => c.getAttribute("aria-label"))).toEqual([
+      "New",
+      "Triaging",
+      "In progress",
+      "Fixed",
+    ]);
+    expect(cols[0].textContent).toContain("New2");
+    expect(cols[0].textContent).toContain("3 errors");
+    expect(cols[0].textContent).toContain("1 error");
+    expect(cols[3].textContent).not.toContain("error");
+    expect(cols[1].textContent).toContain("Drop Rewinds here");
+    expect(cols[2].textContent).toContain("Drop Rewinds here");
+    expect(cols[0].textContent).not.toContain("Drop Rewinds here");
+    expect(cols[0].querySelector('a[href="/r/a"]')).toBeTruthy();
+  });
+});
