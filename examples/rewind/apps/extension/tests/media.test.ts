@@ -268,6 +268,7 @@ describe("startRecorder", () => {
       (type: string) => type.includes("vp9") && FakeRecorder.supported,
     );
     mimeType: string;
+    state: "inactive" | "recording" = "recording";
     ondataavailable: ((e: { data: Blob }) => void) | null = null;
     onstop: (() => void) | null = null;
     pause = vi.fn();
@@ -276,6 +277,7 @@ describe("startRecorder", () => {
     stop = vi.fn(() => {
       this.ondataavailable?.({ data: new Blob(["x"], { type: "text/plain" }) });
       this.ondataavailable?.({ data: new Blob([], { type: "text/plain" }) });
+      this.state = "inactive";
       this.onstop?.();
     });
     constructor(
@@ -321,6 +323,21 @@ describe("startRecorder", () => {
     const recorder = startRecorder({} as MediaStream);
     const blob = await recorder.stop();
     expect(blob.type).toBe("video/webm");
+  });
+
+  it("stop still resolves when the recorder already went inactive (all tracks ended)", async () => {
+    const recorder = startRecorder({} as MediaStream);
+    // Simulate the browser auto-stopping the recorder (e.g. "Stop sharing")
+    // before our code ever calls stop() itself.
+    instances[0]!.ondataavailable?.({
+      data: new Blob(["x"], { type: "text/plain" }),
+    });
+    instances[0]!.state = "inactive";
+    instances[0]!.onstop?.();
+
+    const blob = await recorder.stop();
+    expect(blob.type).toBe("video/webm");
+    expect(instances[0]!.stop).not.toHaveBeenCalled();
   });
 });
 

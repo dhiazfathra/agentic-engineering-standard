@@ -150,18 +150,23 @@ export function startRecorder(stream: MediaStream): Recorder {
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data);
   };
+  const stopped = new Promise<Blob>((resolve) => {
+    recorder.onstop = () => {
+      resolve(new Blob(chunks, { type: WEBM_TYPE }));
+    };
+  });
   recorder.start(TIMESLICE_MS);
 
   return {
     pause: () => recorder.pause(),
     resume: () => recorder.resume(),
-    stop: () =>
-      new Promise<Blob>((resolve) => {
-        recorder.onstop = () => {
-          resolve(new Blob(chunks, { type: WEBM_TYPE }));
-        };
-        recorder.stop();
-      }),
+    stop: () => {
+      // If every track already ended (e.g. "Stop sharing" or tab closed),
+      // the recorder may already be inactive and calling stop() again
+      // dispatches nothing, so onstop would never fire.
+      if (recorder.state !== "inactive") recorder.stop();
+      return stopped;
+    },
   };
 }
 
