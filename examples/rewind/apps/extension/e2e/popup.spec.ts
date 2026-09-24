@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, expect, test } from "@playwright/test";
 
@@ -25,5 +25,8 @@ test("the Chrome build loads unpacked and its popup renders", async () => {
 });
 
 test("the Firefox build exists", () => {
-  expect(existsSync(join(output, "firefox-mv2", "manifest.json"))).toBe(true);
+  const manifestPath = join(output, "firefox-mv3", "manifest.json");
+  expect(existsSync(manifestPath)).toBe(true);
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  expect(manifest.manifest_version).toBe(3);
 });
