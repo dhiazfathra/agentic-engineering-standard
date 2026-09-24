@@ -238,6 +238,32 @@ describe("Recorder: mode=tab", () => {
     });
   });
 
+  it("retries the release a couple of times when it keeps rejecting, then gives up", async () => {
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+    send.mockClear();
+    send.mockImplementation(async (message: { type: string }) => {
+      if (message.type === "recording") throw new Error("no listener");
+      return undefined;
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new Event("pagehide"));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const release = { type: "recording", tabId: 5, since: null };
+    const releaseCalls = send.mock.calls.filter(
+      ([m]) => (m as { type: string }).type === "recording",
+    );
+    expect(releaseCalls).toHaveLength(3);
+    expect(send).toHaveBeenCalledWith(release);
+  });
+
   it("pagehide after Stop does not send a second release", async () => {
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");
@@ -304,6 +330,37 @@ describe("Recorder: mode=tab", () => {
 
     window.dispatchEvent(new Event("pagehide"));
     expect(send).toHaveBeenCalledWith(release);
+  });
+
+  it("retries opening the editor without saving again when tabs.create fails after a successful save", async () => {
+    tabsCreate.mockRejectedValueOnce(new Error("window is closing"));
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+
+    const stopButton = container.querySelector(
+      'button[aria-label="Stop"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+    expect(container.textContent).toContain("window is closing");
+    expect(putDraft).toHaveBeenCalledTimes(1);
+    const savedId = (putDraft.mock.calls[0]![0] as { id: string }).id;
+
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(putDraft).toHaveBeenCalledTimes(1);
+    expect(tabsCreate).toHaveBeenLastCalledWith({
+      url: `chrome-extension://ext/editor.html?id=${savedId}`,
+    });
+    expect(closeSpy).toHaveBeenCalled();
   });
 
   it("lets Stop be clicked again after a failed save, and the retry keeps every event", async () => {
@@ -678,6 +735,21 @@ describe("Recorder: mode=area", () => {
 
     expect(closeSpy).toHaveBeenCalled();
     expect(cropTrack).not.toHaveBeenCalled();
+  });
+
+  it("stops every opened track when the area request itself rejects", async () => {
+    const videoTrack = fakeTrack("video");
+    openTabStream.mockImplementation(async () => fakeStream([videoTrack]));
+    send.mockImplementation(async (message: { type: string }) => {
+      if (message.type === "area") throw new Error("no content script");
+      return undefined;
+    });
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=area&stream=abc");
+    await flush();
+
+    expect(container.textContent).toContain("no content script");
+    expect(videoTrack.stop).toHaveBeenCalled();
   });
 
   it("unmounting while the area rect is pending aborts before acting on it", async () => {

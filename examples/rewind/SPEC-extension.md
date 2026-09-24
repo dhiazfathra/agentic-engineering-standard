@@ -136,9 +136,16 @@ labels drawn in as `image/png`.
   browser's "Stop sharing" ends the capture: the recorder saves a draft
   with the events for its spans and opens the editor. Stop before the
   countdown ends discards instead, since nothing was recorded. If the
-  save fails, the recorder shows the error and keeps the recording and
-  the tab's event hold, so Stop can retry. Closing the recorder window
-  releases the hold.
+  save fails, the recorder shows the error, hides Pause (the recorder is
+  already stopped), and keeps the recording and the tab's event hold, so
+  Stop can retry: once the draft is saved, a retry (e.g. after
+  `tabs.create` fails) reopens that same draft instead of saving it again.
+  If init fails after a tab/mic stream was already opened, every opened
+  track is stopped. Closing the recorder window releases the hold,
+  retrying the release message a couple of times if it's rejected. A hold
+  whose recorder window is gone (crashed, or the release never got
+  through) is dropped by the background on its next startup, once it is
+  older than the hold's max-recording cap and no recorder window is open.
 
 **Instant replay.** Off by default. While on, the background takes a
 JPEG `captureVisibleTab` of the focused window's active `http(s)` tab

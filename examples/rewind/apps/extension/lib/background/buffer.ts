@@ -129,3 +129,18 @@ export async function drop(tabId: number): Promise<void> {
   delete all[tabId];
   scheduleSave();
 }
+
+// ponytail: generous cap on how long a recording can run; if a hold is
+// older than this, its recorder window is gone (crashed, or its release
+// message never made it through), not still recording. Raise it if real
+// recordings need to run longer.
+export const MAX_RECORDING_MS = 2 * 60 * 60 * 1000;
+
+/** Drops holds older than `MAX_RECORDING_MS`, e.g. one left by a recorder window that crashed or closed before it could release it. */
+export async function clearStaleHolds(now = Date.now()): Promise<void> {
+  const tabHolds = await loadHolds();
+  for (const [tabId, since] of Object.entries(tabHolds)) {
+    if (now - since > MAX_RECORDING_MS) delete tabHolds[Number(tabId)];
+  }
+  await holdsStore.setValue(tabHolds);
+}

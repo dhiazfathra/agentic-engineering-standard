@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import background from "../entrypoints/background";
+import * as buffer from "../lib/background/buffer";
 import * as replay from "../lib/background/replay";
 import { getDraft } from "../lib/drafts";
 import { resetSettings, updateSettings } from "../lib/settings";
@@ -186,6 +187,63 @@ describe("background", () => {
       () => {},
     );
     expect(events).toEqual([]);
+  });
+
+  it("clears stale holds on startup when no recorder window is open", async () => {
+    await buffer.hold(91, Date.now() - buffer.MAX_RECORDING_MS - 1);
+    background.main();
+    // `clearStaleHolds` runs off a `tabs.query().then(...)` at startup, not
+    // awaited by `main()`: give its microtasks a turn before asserting.
+    await Promise.resolve();
+    await Promise.resolve();
+    await fakeBrowser.runtime.onMessage.trigger(
+      {
+        type: "event",
+        event: { at: Date.now(), kind: "log", text: "hi", isError: false },
+      },
+      { tab: { id: 91 } } as never,
+      () => {},
+    );
+    await fakeBrowser.tabs.onRemoved.trigger(91, {
+      isWindowClosing: false,
+      windowId: 1,
+    });
+    const [events] = await fakeBrowser.runtime.onMessage.trigger(
+      { type: "events", tabId: 91, spans: [{ start: 0, end: Date.now() }] },
+      {},
+      () => {},
+    );
+    // The hold was cleared, so the tab's buffer was droppable on close.
+    expect(events).toEqual([]);
+  });
+
+  it("keeps a hold on startup when a recorder window is open", async () => {
+    await buffer.hold(91, Date.now() - buffer.MAX_RECORDING_MS - 1);
+    vi.spyOn(browser.tabs, "query").mockImplementation(
+      async () =>
+        [{ id: 1, url: "chrome-extension://ext/recorder.html?tab=9" }] as never,
+    );
+    background.main();
+    await Promise.resolve();
+    await fakeBrowser.runtime.onMessage.trigger(
+      {
+        type: "event",
+        event: { at: Date.now(), kind: "log", text: "hi", isError: false },
+      },
+      { tab: { id: 91 } } as never,
+      () => {},
+    );
+    await fakeBrowser.tabs.onRemoved.trigger(91, {
+      isWindowClosing: false,
+      windowId: 1,
+    });
+    const [events] = await fakeBrowser.runtime.onMessage.trigger(
+      { type: "events", tabId: 91, spans: [{ start: 0, end: Date.now() }] },
+      {},
+      () => {},
+    );
+    // The hold is still in place, so the buffer survived the tab closing.
+    expect(events).toHaveLength(1);
   });
 
   it("keeps a held buffer when its tab closes, and drops it on release", async () => {

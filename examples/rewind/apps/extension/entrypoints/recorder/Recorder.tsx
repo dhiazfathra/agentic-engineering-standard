@@ -63,6 +63,9 @@ export default function Recorder() {
   const openStartRef = useRef<number | null>(null);
   const stoppingRef = useRef(false);
   const urlRef = useRef("");
+  // Set once `putDraft` succeeds, so a retry after `tabs.create` fails just
+  // reopens the same draft instead of capturing and saving it again.
+  const draftIdRef = useRef<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
 
@@ -93,26 +96,32 @@ export default function Recorder() {
     stoppingRef.current = true;
     closeOpenSpan();
     try {
-      const blob = await recorder.stop();
-      stopTracks();
+      // Already saved on an earlier attempt (only `tabs.create` failed):
+      // reopen that draft instead of capturing and saving it again.
+      let id = draftIdRef.current;
+      if (id === null) {
+        const blob = await recorder.stop();
+        stopTracks();
 
-      const spans = spansRef.current;
-      const events = await send<import("@rewind/schema").Event[]>({
-        type: "events",
-        tabId,
-        spans,
-      });
+        const spans = spansRef.current;
+        const events = await send<import("@rewind/schema").Event[]>({
+          type: "events",
+          tabId,
+          spans,
+        });
 
-      const id = newId();
-      await putDraft({
-        id,
-        createdAt: Date.now(),
-        url: urlRef.current,
-        kind: "video",
-        blob,
-        durationSeconds: spanSeconds(spans),
-        events,
-      });
+        id = newId();
+        await putDraft({
+          id,
+          createdAt: Date.now(),
+          url: urlRef.current,
+          kind: "video",
+          blob,
+          durationSeconds: spanSeconds(spans),
+          events,
+        });
+        draftIdRef.current = id;
+      }
 
       await send({ type: "recording", tabId, since: null }).catch(
         () => undefined,
@@ -165,6 +174,10 @@ export default function Recorder() {
     let cancelled = false;
 
     async function init(): Promise<void> {
+      // Any track opened below (tab/mic capture) is stopped in `catch` if
+      // init fails partway through, so a rejected `send` doesn't leave the
+      // tab/mic capture indicator on with nothing recording it.
+      let openedTracks: MediaStreamTrack[] = [];
       try {
         const current = await settings.getValue();
         applyTheme(current.theme);
@@ -194,6 +207,7 @@ export default function Recorder() {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+        openedTracks = stream.getTracks();
         let video = stream.getVideoTracks()[0]!;
 
         if (mode === "area") {
@@ -218,6 +232,7 @@ export default function Recorder() {
         /* v8 ignore next */
         if (!cancelled) await afterVideoTrack(video);
       } catch (err) {
+        openedTracks.forEach((t) => t.stop());
         if (cancelled) return;
         setInitError(
           err instanceof Error ? err.message : "Could not start recording",
@@ -225,16 +240,25 @@ export default function Recorder() {
       }
     }
 
-    function release(): void {
-      if (!stoppingRef.current)
-        void send({ type: "recording", tabId, since: null });
+    // A rejected release (e.g. the background isn't listening yet) must not
+    // leave the tab's event hold stuck forever: retry a couple of times.
+    function release(retriesLeft = 2): void {
+      if (stoppingRef.current) return;
+      void send({ type: "recording", tabId, since: null }).catch(() => {
+        if (retriesLeft > 0) release(retriesLeft - 1);
+      });
     }
 
+    // A stable wrapper (not `release` itself) is registered/unregistered,
+    // since `release` now takes a retry count that must not be fed the
+    // `PageTransitionEvent` the listener would otherwise pass as an arg.
+    const onPageHide = (): void => release();
+
     void init();
-    window.addEventListener("pagehide", release);
+    window.addEventListener("pagehide", onPageHide);
     return () => {
       cancelled = true;
-      window.removeEventListener("pagehide", release);
+      window.removeEventListener("pagehide", onPageHide);
     };
     // Params never change after mount; this effect runs exactly once.
   }, []);
@@ -396,7 +420,7 @@ export default function Recorder() {
           </span>
         )}
 
-        {phase === "recording" && (
+        {phase === "recording" && !saveError && (
           <button
             className={styles.barButton}
             title={recordingPaused ? "Resume" : "Pause"}

@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   add,
+  clearStaleHolds,
   drop,
   eventsFor,
   hold,
+  MAX_RECORDING_MS,
   parseCapturedEvent,
   raw,
 } from "../../lib/background/buffer";
@@ -129,6 +131,18 @@ describe("buffer", () => {
   it("add silently drops a forged event that fails validation", async () => {
     await add(10, { ...eventAt(BASE), kind: "bogus" });
     expect(await raw(10)).toEqual([]);
+  });
+
+  it("clearStaleHolds drops a hold older than MAX_RECORDING_MS, keeps a recent one", async () => {
+    await hold(11, BASE - MAX_RECORDING_MS - 1);
+    await hold(12, BASE - 100);
+    await clearStaleHolds(BASE);
+
+    const stored = (await fakeBrowser.storage.session.get("holds")) as {
+      holds: Record<number, number>;
+    };
+    expect(stored.holds[11]).toBeUndefined();
+    expect(stored.holds[12]).toBe(BASE - 100);
   });
 
   it("debounces the save to storage.session", async () => {

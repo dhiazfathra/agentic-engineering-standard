@@ -68,6 +68,17 @@ export default defineBackground(() => {
     void buffer.drop(tabId);
   });
 
+  // A recorder window that crashes, or whose release message never makes it
+  // through before the window closes, can leave a hold stuck forever (its
+  // buffer then never gets dropped either). On every service worker start,
+  // if no recorder window is currently open, any hold old enough that it
+  // can't belong to a real recording is stale: drop it.
+  void browser.tabs
+    .query({ url: browser.runtime.getURL("/recorder.html*") })
+    .then((recorderTabs) => {
+      if (recorderTabs.length === 0) void buffer.clearStaleHolds();
+    });
+
   browser.commands.onCommand.addListener(async (command) => {
     const [tab] = await browser.tabs.query({
       active: true,
