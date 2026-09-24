@@ -3,6 +3,9 @@ import type { CapturedEvent } from "./messages";
 
 export type Span = { start: number; end: number };
 
+/** Longest event `text` that `createRewind` accepts. */
+export const MAX_TEXT_LENGTH = 10_000;
+
 /** Seconds of active capture before `at`, or null when `at` is outside every span. */
 export function mediaTime(at: number, spans: Span[]): number | null {
   let t = 0;
@@ -31,7 +34,7 @@ export function toRewindEvents(
     events.push({
       t,
       kind: c.kind,
-      text: c.text.slice(0, 10_000),
+      text: c.text.slice(0, MAX_TEXT_LENGTH),
       isError: c.isError,
     });
   }

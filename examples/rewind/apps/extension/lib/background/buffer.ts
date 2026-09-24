@@ -5,7 +5,7 @@ import { storage } from "wxt/utils/storage";
 import { trim } from "../buffer";
 import type { CapturedEvent } from "../messages";
 import type { Span } from "../timeline";
-import { toRewindEvents } from "../timeline";
+import { MAX_TEXT_LENGTH, toRewindEvents } from "../timeline";
 
 // A page script can forge `window.postMessage({ source: "rewind", event })`,
 // which the content script relays to `add` unvalidated. This is the trust
@@ -14,9 +14,8 @@ import { toRewindEvents } from "../timeline";
 // break `toRewindEvents`/`createRewind.parse` downstream, or that could
 // never actually age out of the buffer.
 const MAX_CLOCK_SKEW_MS = 5000;
-// Same cap `toRewindEvents` applies at flush; cut here too, at the trust
+// `toRewindEvents` applies the same cap at flush; cut here too, at the trust
 // boundary, so an oversized `text` never sits in `storage.session` (10 MB).
-const MAX_TEXT_LENGTH = 10_000;
 
 const capturedEventSchema = z.object({
   at: z.number().finite(),
