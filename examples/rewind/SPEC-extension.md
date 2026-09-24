@@ -135,8 +135,10 @@ labels drawn in as `image/png`.
   recorder's `pause()` and `resume()`. Stop, the tab closing, or the
   browser's "Stop sharing" ends the capture: the recorder saves a draft
   with the events for its spans and opens the editor. Stop before the
-  countdown ends discards instead, since nothing was recorded. Closing
-  the recorder window releases the tab's event hold.
+  countdown ends discards instead, since nothing was recorded. If the
+  save fails, the recorder shows the error and keeps the recording and
+  the tab's event hold, so Stop can retry. Closing the recorder window
+  releases the hold.
 
 **Instant replay.** Off by default. While on, the background takes a
 JPEG `captureVisibleTab` of the focused window's active `http(s)` tab
@@ -145,8 +147,9 @@ snapshots older than 2 minutes. An alarm every 30 seconds restarts the
 loop after the worker sleeps. Turning it off deletes every snapshot
 and clears the alarm.
 **Save instant replay** makes a draft from that tab's snapshots and
-events. The editor encodes the snapshots into a `video/webm` at their
-real times with Mediabunny (WebCodecs), then treats it as a recording.
+events, and fails if the tab is no longer on an `http(s)` page. The
+editor encodes the snapshots into a `video/webm` at their real times
+with Mediabunny (WebCodecs), then treats it as a recording.
 
 **Drafts.** Every capture is a draft in the extension's IndexedDB
 (`rewind` database, `captures` and `snapshots` stores) until it is
