@@ -40,17 +40,17 @@ two routes and their tests · **Scope:** S
 
 ## T3: Page, shell, grid
 
-- [ ] `src/components/toast.tsx` (`useToast`: plain toasts clear after
+- [x] `src/components/toast.tsx` (`useToast`: plain toasts clear after
       3 s; action toasts carry Undo and `×`, have no timer, and stack) and `src/lib/copy-link.ts`, moved out
       of `r/[id]/viewer.tsx`; the viewer uses them and its tests pass.
-- [ ] `src/app/page.tsx`: parses `searchParams`, loads with
+- [x] `src/app/page.tsx`: parses `searchParams`, loads with
       `Promise.all`, renders `<Library>`. Test found and folder cases.
-- [ ] `src/app/library.tsx` (`"use client"`) and `library.module.css`:
+- [x] `src/app/library.tsx` (`"use client"`) and `library.module.css`:
       sidebar (palette button, All Rewinds, folders with dot and count,
       theme toggle slot), header (title, count, view segment updating
       the URL), grid cards per `is.grid` with copy link on hover. Cards
       link to `/r/[id]`.
-- [ ] DOM test (`happy-dom`): cards render, view segment calls
+- [x] DOM test (`happy-dom`): cards render, view segment calls
       `router.replace`, folder click filters, copy link toasts.
 
 **Verification:** tests at 100%; `bun run dev`, open `/`, see 8 seeded
