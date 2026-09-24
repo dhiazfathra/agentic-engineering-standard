@@ -27,7 +27,7 @@ describe("start/stop", () => {
 
   it("captures the focused window's active http(s) tab every second", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-    await fakeBrowser.tabs.update(0, { active: true });
+    await fakeBrowser.tabs.update(0, { active: true, url: "https://a.co/x" });
     vi.spyOn(browser.tabs, "query").mockResolvedValue([
       { id: 0, windowId: 0, url: "https://a.co/x" },
     ] as never);
@@ -151,14 +151,16 @@ describe("save", () => {
     expect(draft?.frames).toHaveLength(1);
   });
 
-  it("falls back to an empty url when the tab has none", async () => {
+  it("refuses a draft when the tab is no longer on an http(s) page", async () => {
     const blob = new Blob(["jpeg"], { type: "image/jpeg" });
     await putSnapshot({ tabId: 2, at: Date.now() - 1000, blob });
-    vi.spyOn(browser.tabs, "get").mockResolvedValue({ id: 2 } as never);
-    vi.spyOn(browser.tabs, "create").mockResolvedValue({} as never);
+    vi.spyOn(browser.tabs, "get").mockResolvedValue({
+      id: 2,
+      url: "chrome://extensions",
+    } as never);
+    const createSpy = vi.spyOn(browser.tabs, "create");
 
-    const result = await save(2);
-    const draft = await getDraft((result as { id: string }).id);
-    expect(draft?.url).toBe("");
+    expect(await save(2)).toEqual({ error: "Replay needs an http(s) page" });
+    expect(createSpy).not.toHaveBeenCalled();
   });
 });

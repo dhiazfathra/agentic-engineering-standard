@@ -300,6 +300,32 @@ describe("Recorder: mode=tab", () => {
     expect(closeSpy).not.toHaveBeenCalled();
   });
 
+  it("lets Stop be clicked again after a failed save, and the retry saves a draft", async () => {
+    putDraft.mockRejectedValueOnce(new Error("quota exceeded"));
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+
+    const stopButton = container.querySelector(
+      'button[aria-label="Stop"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+    expect(container.textContent).toContain("quota exceeded");
+
+    await act(async () => {
+      stopButton.click();
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(putDraft).toHaveBeenCalledTimes(2);
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
   it("still releases the hold when the release message itself rejects", async () => {
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");

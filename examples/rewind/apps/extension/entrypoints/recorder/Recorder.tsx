@@ -120,13 +120,14 @@ export default function Recorder() {
       window.close();
     } catch (err) {
       stopTracks();
+      stoppingRef.current = false;
       setSaveError(
         err instanceof Error ? err.message : "Could not save the recording",
       );
     } finally {
       // Release the background's hold on this tab's event buffer no matter
       // how the save above ends, so a failure here can never leave the tab
-      // stuck (or a retry blocked by `stoppingRef` staying true forever).
+      // stuck.
       await send({ type: "recording", tabId, since: null }).catch(
         () => undefined,
       );

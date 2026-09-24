@@ -4,6 +4,7 @@ import { REPLAY_MS } from "../buffer";
 import { putDraft, putSnapshot, pruneSnapshots, snapshotsFor } from "../drafts";
 import type { Span } from "../timeline";
 import * as buffer from "./buffer";
+import { isHttpUrl } from "../url";
 import { captureTab } from "./screenshot";
 
 const TICK_MS = 1000;
@@ -22,11 +23,7 @@ async function tick(): Promise<void> {
       active: true,
       lastFocusedWindow: true,
     });
-    if (
-      tab?.id == null ||
-      tab.windowId == null ||
-      !tab.url?.startsWith("http")
-    ) {
+    if (tab?.id == null || tab.windowId == null || !isHttpUrl(tab.url)) {
       return;
     }
     const blob = await captureTab(tab.id, tab.windowId, {
@@ -68,12 +65,13 @@ export async function save(
   const span: Span = { start: first, end: last + 1000 };
 
   const tab = await browser.tabs.get(tabId);
+  if (!isHttpUrl(tab.url)) return { error: "Replay needs an http(s) page" };
   const events = await buffer.eventsFor(tabId, [span]);
   const id = newId();
   await putDraft({
     id,
     createdAt: Date.now(),
-    url: tab.url ?? "",
+    url: tab.url,
     kind: "replay",
     frames: snapshots.map((s) => ({ at: s.at, blob: s.blob })),
     events,
