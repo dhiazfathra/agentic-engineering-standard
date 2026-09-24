@@ -8,7 +8,7 @@ export default defineConfig({
   use: { baseURL: `http://localhost:${port}` },
   webServer: {
     // Fresh DB each run: delete a stale e2e.db, migrate, then build+start.
-    command: `rm -f e2e.db && drizzle-kit migrate && next build && next start -p ${port}`,
+    command: `rm -f e2e.db && drizzle-kit migrate && bun src/db/seed-cli.ts && next build && next start -p ${port}`,
     url: `http://localhost:${port}`,
     env: {
       ...localEnv,

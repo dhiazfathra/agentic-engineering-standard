@@ -3,7 +3,7 @@
  * project 9bb10f93-f534-4e75-831a-253a96666114:
  *   - :root blocks from _ds/design-system-65475502-dc49-4a77-b1cb-bd52efd5a09b/_ds_bundle.css
  *     (generated from the design system's Dart theme upstream)
- *   - body and body.rw-dark blocks from Rewind.dc.html
+ *   - body, body.rw-dark and the global `a` rule from Rewind.dc.html
  * Refresh by re-copying from the design; do not hand-edit values.
  */
 
@@ -429,4 +429,14 @@ body.rw-dark {
   --rw-scrim: rgba(0, 0, 0, 0.6);
   --rw-frame: #080b0b;
   --rw-pop: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+a {
+  color: var(--rw-accent-ink);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--rw-accent);
+  text-decoration: underline;
 }
