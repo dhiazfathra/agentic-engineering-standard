@@ -670,6 +670,55 @@ describe("rename", () => {
     expect(container.textContent).toContain("Could not rename Rewind");
   });
 
+  it("a queued rename that fails after the first succeeds rolls back to the first", async () => {
+    let resolveFirst!: (r: Response) => void;
+    let resolveSecond!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveFirst = r)),
+      )
+      .mockImplementationOnce(
+        () => new Promise<Response>((r) => (resolveSecond = r)),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mountOne();
+
+    type(startRename(), "First");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+
+    click(q('[aria-label="Actions for First"]'));
+    click(menuItem("Rename"));
+    type(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Second");
+    key(q('input[aria-label="Rewind title"]') as HTMLInputElement, "Enter");
+    await flush();
+
+    await act(async () => {
+      resolveFirst(new Response(JSON.stringify({}), { status: 200 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await act(async () => {
+      resolveSecond(new Response(JSON.stringify({}), { status: 500 }));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(container.textContent).toContain("First");
+    expect(container.textContent).not.toContain("Second");
+    expect(container.textContent).toContain("Could not rename Rewind");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rewinds/seed-r1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "First" }),
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rewinds/seed-r1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "Second" }),
+    });
+  });
+
   it("first PATCH fails while newer rename queued: no rollback, then sends newest", async () => {
     let resolveFirst!: (r: Response) => void;
     const fetchMock = vi
