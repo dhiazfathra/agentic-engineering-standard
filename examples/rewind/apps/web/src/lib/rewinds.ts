@@ -38,9 +38,9 @@ export async function listRewinds() {
       recordingLinkId: rewinds.recordingLinkId,
       createdAt: rewinds.createdAt,
       updatedAt: rewinds.updatedAt,
-      // Column refs inside a `sql` tag render unqualified, so both sides of
-      // the correlation are spelled out explicitly to avoid the subquery's
-      // own `events.id`/`events.rewindId` shadowing the outer `rewinds.id`.
+      // A single-table select strips table names from interpolated columns,
+      // even inside a `sql` tag, so both sides of the correlation are spelled
+      // out by hand; otherwise `id` binds to the subquery's own `events.id`.
       errorCount: sql<number>`(
         select count(*) from ${events}
         where "events"."rewindId" = "rewinds"."id" and "events"."isError" = true
