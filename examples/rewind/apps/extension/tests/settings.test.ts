@@ -2,7 +2,6 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   DEFAULTS,
-  defaultsFor,
   resetSettings,
   settings,
   updateSettings,
@@ -10,16 +9,6 @@ import {
 
 beforeEach(() => {
   fakeBrowser.reset();
-});
-
-describe("defaultsFor", () => {
-  it("keeps tab as the default record mode when tabCapture exists", () => {
-    expect(defaultsFor(true).recordMode).toBe("tab");
-  });
-
-  it("defaults to desktop when there is no tabCapture (Firefox)", () => {
-    expect(defaultsFor(false).recordMode).toBe("desktop");
-  });
 });
 
 describe("settings", () => {

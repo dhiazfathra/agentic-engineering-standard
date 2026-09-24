@@ -552,6 +552,23 @@ describe("settings", () => {
     });
   });
 
+  it("Reset restores defaults and shows the default app URL", async () => {
+    await openSettings();
+    const input = q("#rw-app-url") as HTMLInputElement;
+    change(input, "https://example.com");
+    blur(input);
+    await flush();
+    const reset = [...container.querySelectorAll("button")].find(
+      (b) => b.textContent === "Reset",
+    ) as HTMLButtonElement;
+    await act(async () => {
+      reset.click();
+    });
+    await flush();
+    expect(await settings.getValue()).toEqual(DEFAULTS);
+    expect((q("#rw-app-url") as HTMLInputElement).value).toBe(DEFAULTS.appUrl);
+  });
+
   it("updates the name", async () => {
     await openSettings();
     const input = q("#rw-name") as HTMLInputElement;

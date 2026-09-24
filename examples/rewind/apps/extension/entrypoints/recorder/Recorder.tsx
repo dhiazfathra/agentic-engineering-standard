@@ -61,6 +61,7 @@ export default function Recorder() {
   const spansRef = useRef<Span[]>([]);
   const openStartRef = useRef<number | null>(null);
   const stoppingRef = useRef(false);
+  const urlRef = useRef("");
 
   function closeOpenSpan(): void {
     if (openStartRef.current === null) return;
@@ -74,6 +75,7 @@ export default function Recorder() {
   }
 
   async function discard(): Promise<void> {
+    stoppingRef.current = true;
     closeOpenSpan();
     recorderRef.current?.stop().catch(() => undefined);
     stopTracks();
@@ -83,10 +85,11 @@ export default function Recorder() {
 
   async function stop(): Promise<void> {
     if (stoppingRef.current) return;
+    const recorder = recorderRef.current;
+    if (!recorder) return discard();
     stoppingRef.current = true;
     closeOpenSpan();
-    const recorder = recorderRef.current;
-    const blob = recorder ? await recorder.stop() : new Blob();
+    const blob = await recorder.stop();
     stopTracks();
 
     const spans = spansRef.current;
@@ -97,12 +100,11 @@ export default function Recorder() {
     });
     await send({ type: "recording", tabId, since: null });
 
-    const tab = await browser.tabs.get(tabId);
     const id = newId();
     await putDraft({
       id,
       createdAt: Date.now(),
-      url: tab.url ?? "",
+      url: urlRef.current,
       kind: "video",
       blob,
       durationSeconds: spanSeconds(spans),
@@ -152,6 +154,7 @@ export default function Recorder() {
     async function init(): Promise<void> {
       const current = await settings.getValue();
       applyTheme(current.theme);
+      urlRef.current = (await browser.tabs.get(tabId)).url ?? "";
 
       if (mode === "desktop") {
         setPhase("desktop-picker");
@@ -187,7 +190,7 @@ export default function Recorder() {
   // Countdown ticking.
   useEffect(() => {
     if (phase !== "countdown") return;
-    if (countdownPaused) return;
+    if (countdownPaused || stoppingRef.current) return;
     if (countdown <= 0) {
       const stream = new MediaStream(
         [videoTrackRef.current, micTrackRef.current].filter(

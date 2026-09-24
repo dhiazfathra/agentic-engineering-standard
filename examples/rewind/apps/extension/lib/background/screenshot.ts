@@ -1,5 +1,5 @@
 import { newId } from "@rewind/schema";
-import { browser } from "wxt/browser";
+import { browser, type Browser } from "wxt/browser";
 import { REPLAY_MS } from "../buffer";
 import { putDraft } from "../drafts";
 import type { Delay } from "../settings";
@@ -12,6 +12,19 @@ function sleep(ms: number): Promise<void> {
   return ms > 0
     ? new Promise((resolve) => setTimeout(resolve, ms))
     : Promise.resolve();
+}
+
+/** Captures `windowId`, rejecting unless `tabId` is still the tab it shows. */
+export async function captureTab(
+  tabId: number,
+  windowId: number,
+  options: Browser.extensionTypes.ImageDetails,
+): Promise<Blob> {
+  const dataUrl = await browser.tabs.captureVisibleTab(windowId, options);
+  if (!(await browser.tabs.get(tabId)).active) {
+    throw new Error("The tab is no longer visible");
+  }
+  return (await fetch(dataUrl)).blob();
 }
 
 /**
@@ -29,10 +42,7 @@ export async function takeScreenshot(
     throw new Error("Cannot capture a non-http(s) tab");
   }
 
-  const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
-    format: "png",
-  });
-  const blob = await (await fetch(dataUrl)).blob();
+  const blob = await captureTab(tabId, tab.windowId, { format: "png" });
 
   const now = Date.now();
   const raw = await buffer.raw(tabId);

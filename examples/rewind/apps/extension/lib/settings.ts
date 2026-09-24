@@ -30,11 +30,6 @@ export const DEFAULTS: Settings = {
   micDeviceId: "default",
 };
 
-/** Firefox has no `tabCapture`, so it defaults to desktop recording. */
-export function defaultsFor(hasTabCapture: boolean): Settings {
-  return hasTabCapture ? DEFAULTS : { ...DEFAULTS, recordMode: "desktop" };
-}
-
 export const settings = storage.defineItem<Settings>("local:settings", {
   fallback: DEFAULTS,
 });

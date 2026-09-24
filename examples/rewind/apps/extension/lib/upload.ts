@@ -13,14 +13,17 @@ export type FileDraftArgs = {
 
 export type FileDraftResult = { id: string; viewerUrl: string };
 
-/** `Screenshot of host/path` or `Recording of host/path`. */
+export const TITLE_MAX = createRewind.shape.title.maxLength!;
+const URL_MAX = createRewind.shape.url.maxLength!;
+
+/** `Screenshot of host/path` or `Recording of host/path`, cut to the title limit. */
 export function defaultTitle(
   kind: "screenshot" | "video" | "replay",
   url: string,
 ): string {
   const u = new URL(url);
   const verb = kind === "screenshot" ? "Screenshot" : "Recording";
-  return `${verb} of ${u.host}${u.pathname}`;
+  return `${verb} of ${u.host}${u.pathname}`.slice(0, TITLE_MAX);
 }
 
 async function checkOk(res: Response, step: string): Promise<void> {
@@ -43,8 +46,11 @@ export async function fileDraft({
   appUrl,
   blob,
   contentType,
-  rewind,
+  rewind: draft,
 }: FileDraftArgs): Promise<FileDraftResult> {
+  const pageUrl = new URL(draft.url);
+  pageUrl.hash = "";
+  const rewind = { ...draft, url: pageUrl.href.slice(0, URL_MAX) };
   // Validate before any network call, so a bad body never reaches fetch.
   createRewind.parse({ ...rewind, mediaKey: placeholderKey(contentType) });
 
@@ -75,5 +81,8 @@ export async function fileDraft({
   await checkOk(createRes, "POST /api/rewinds");
   const created = (await createRes.json()) as { id: string };
 
-  return { id: created.id, viewerUrl: `${appUrl}/r/${created.id}` };
+  return {
+    id: created.id,
+    viewerUrl: new URL(`/r/${created.id}`, appUrl).href,
+  };
 }

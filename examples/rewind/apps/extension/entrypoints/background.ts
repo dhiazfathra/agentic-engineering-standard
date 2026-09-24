@@ -28,7 +28,13 @@ async function handleMessage(
     case "record":
       return openRecorder(message.tabId, message.mode, message.streamId);
     case "recording":
-      return buffer.hold(message.tabId, message.since);
+      await buffer.hold(message.tabId, message.since);
+      if (message.since === null) {
+        await browser.tabs
+          .get(message.tabId)
+          .catch(() => buffer.drop(message.tabId));
+      }
+      return undefined;
     case "area":
       return selectArea(message.tabId);
     case "save-replay":

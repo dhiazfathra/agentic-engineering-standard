@@ -85,10 +85,20 @@ describe("buffer", () => {
     expect(stored.holds[8]).toBeUndefined();
   });
 
-  it("drop clears a tab's buffer and hold", async () => {
+  it("drop clears a tab's buffer", async () => {
     await add(5, eventAt(BASE));
     await drop(5);
     expect(await raw(5)).toEqual([]);
+  });
+
+  it("drop keeps a buffer a recording still holds", async () => {
+    await hold(6, BASE);
+    await add(6, eventAt(BASE));
+    await drop(6);
+    expect(await raw(6)).toHaveLength(1);
+    await hold(6, null);
+    await drop(6);
+    expect(await raw(6)).toEqual([]);
   });
 
   it("survives two concurrent `add`s on a cold buffer (no lost load overwrite)", async () => {

@@ -119,6 +119,7 @@ beforeEach(async () => {
   vi.useFakeTimers();
   await resetSettings();
   closeSpy = vi.spyOn(window, "close").mockImplementation(() => undefined);
+  tabsGet.mockImplementation(async () => ({ url: "https://example.com/page" }));
   send.mockReset();
   send.mockImplementation(async (message: { type: string }) => {
     if (message.type === "events") return [];
@@ -197,7 +198,7 @@ describe("Recorder: mode=tab", () => {
     expect(container.textContent).toContain("Recording in 3");
   });
 
-  it("Stop during the countdown finalizes with an empty blob (no recorder yet)", async () => {
+  it("Stop during the countdown discards: no draft, hold released, no recorder starts", async () => {
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");
     await flush();
@@ -209,18 +210,22 @@ describe("Recorder: mode=tab", () => {
       stopButton.click();
       await Promise.resolve();
     });
-    await flush();
+    await flush(3000);
 
-    expect(putDraft).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "video" }),
-    );
+    expect(putDraft).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith({
+      type: "recording",
+      tabId: 5,
+      since: null,
+    });
+    expect(startRecorder).not.toHaveBeenCalled();
     expect(closeSpy).toHaveBeenCalled();
   });
 
   it("A second Stop click while the first is finalizing is a no-op", async () => {
     await updateSettings({ micOn: false });
     await mount("?tab=5&mode=tab&stream=abc");
-    await flush();
+    await flush(3000);
 
     const stopButton = container.querySelector(
       'button[aria-label="Stop"]',
@@ -296,6 +301,26 @@ describe("Recorder: mode=tab", () => {
     });
     await flush();
     expect(putDraft).toHaveBeenCalled();
+  });
+
+  it("closing the recorded tab still saves a draft with the tab's url", async () => {
+    const track = fakeTrack("video");
+    openTabStream.mockImplementation(async () => fakeStream([track]));
+    await updateSettings({ micOn: false });
+    await mount("?tab=5&mode=tab&stream=abc");
+    await flush(3000);
+
+    tabsGet.mockRejectedValue(new Error("No tab with id: 5"));
+    await act(async () => {
+      track.dispatch("ended");
+      await Promise.resolve();
+    });
+    await flush();
+
+    expect(putDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "https://example.com/page" }),
+    );
+    expect(closeSpy).toHaveBeenCalled();
   });
 
   it("mic on: toggling mic mutes/unmutes the track", async () => {
@@ -386,22 +411,6 @@ describe("Recorder: mode=tab", () => {
       await Promise.resolve();
     });
     expect(closeSpy).toHaveBeenCalled();
-  });
-
-  it("Stop before the recorder starts (still counting down) still saves a draft", async () => {
-    await updateSettings({ micOn: false });
-    await mount("?tab=5&mode=tab&stream=abc");
-    await flush();
-
-    const stopButton = container.querySelector(
-      'button[aria-label="Stop"]',
-    ) as HTMLButtonElement;
-    await act(async () => {
-      stopButton.click();
-      await Promise.resolve();
-    });
-    await flush();
-    expect(putDraft).toHaveBeenCalled();
   });
 
   it("defaults the draft's url to empty when the tab has none", async () => {

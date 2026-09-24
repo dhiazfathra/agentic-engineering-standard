@@ -78,7 +78,7 @@ describe("background", () => {
 
     it("takes a screenshot for the requested tab", async () => {
       background.main();
-      await fakeBrowser.tabs.update(0, { url: "https://a.co/x" });
+      await fakeBrowser.tabs.update(0, { url: "https://a.co/x", active: true });
       vi.spyOn(browser.tabs, "captureVisibleTab").mockResolvedValue(
         "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" as never,
       );
@@ -188,11 +188,53 @@ describe("background", () => {
     expect(events).toEqual([]);
   });
 
+  it("keeps a held buffer when its tab closes, and drops it on release", async () => {
+    background.main();
+    const eventsOf9 = async () =>
+      (
+        await fakeBrowser.runtime.onMessage.trigger(
+          {
+            type: "events",
+            tabId: 9,
+            spans: [{ start: 0, end: Date.now() + 1000 }],
+          },
+          {},
+          () => {},
+        )
+      )[0];
+    await fakeBrowser.runtime.onMessage.trigger(
+      { type: "recording", tabId: 9, since: Date.now() },
+      {},
+      () => {},
+    );
+    await fakeBrowser.runtime.onMessage.trigger(
+      {
+        type: "event",
+        event: { at: Date.now(), kind: "log", text: "hi", isError: false },
+      },
+      { tab: { id: 9 } } as never,
+      () => {},
+    );
+    await fakeBrowser.tabs.onRemoved.trigger(9, {
+      isWindowClosing: false,
+      windowId: 1,
+    });
+    expect(await eventsOf9()).toHaveLength(1);
+
+    vi.spyOn(browser.tabs, "get").mockRejectedValue(new Error("No tab 9"));
+    await fakeBrowser.runtime.onMessage.trigger(
+      { type: "recording", tabId: 9, since: null },
+      {},
+      () => {},
+    );
+    expect(await eventsOf9()).toEqual([]);
+  });
+
   // Sets up the default tab's real state (id 0) and points `tabs.query` at it,
   // since fakeBrowser's real `query` needs a focused window that nothing in
   // this suite creates.
   async function stubActiveTab(): Promise<void> {
-    await fakeBrowser.tabs.update(0, { url: "https://a.co/x" });
+    await fakeBrowser.tabs.update(0, { url: "https://a.co/x", active: true });
     vi.spyOn(browser.tabs, "query").mockImplementation(async () => [
       await fakeBrowser.tabs.get(0),
     ]);

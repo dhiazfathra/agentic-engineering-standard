@@ -119,12 +119,11 @@ export async function hold(tabId: number, since: number | null): Promise<void> {
   await holdsStore.setValue(tabHolds);
 }
 
-/** Drops a tab's buffer, e.g. when the tab closes. */
+/** Drops a tab's buffer, e.g. when the tab closes, unless a recording still holds it. */
 export async function drop(tabId: number): Promise<void> {
+  const tabHolds = await loadHolds();
+  if (tabHolds[tabId] !== undefined) return;
   const all = await load();
   delete all[tabId];
-  const tabHolds = await loadHolds();
-  delete tabHolds[tabId];
-  await holdsStore.setValue(tabHolds);
   scheduleSave();
 }

@@ -53,8 +53,8 @@ text, isError?)` stamping `at: Date.now()`.
       `trim(events, now, holdSince)` (keeps events newer than
       `now - REPLAY_MS` or `holdSince`, then the newest `MAX_EVENTS`).
 - [x] `lib/settings.ts`: `settings = storage.defineItem<Settings>("local:settings", { fallback: DEFAULTS })`,
-      `DEFAULTS` per the spec, `defaultsFor(hasTabCapture)` for the
-      Firefox record mode, `updateSettings(patch)`, `resetSettings()`.
+      `DEFAULTS` per the spec, `updateSettings(patch)`, `resetSettings()`.
+      The popup forces Desktop on Firefox through `effectiveMode`.
 - [x] `lib/drafts.ts`: `Draft` per the plan; `putDraft`, `getDraft`,
       `listDrafts` (newest first), `deleteDraft`; `putSnapshot({tabId,
 at, blob})`, `snapshotsFor(tabId, since)`, `pruneSnapshots(before)`,

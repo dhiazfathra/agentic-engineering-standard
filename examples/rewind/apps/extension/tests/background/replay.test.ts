@@ -27,6 +27,7 @@ describe("start/stop", () => {
 
   it("captures the focused window's active http(s) tab every second", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    await fakeBrowser.tabs.update(0, { active: true });
     vi.spyOn(browser.tabs, "query").mockResolvedValue([
       { id: 0, windowId: 0, url: "https://a.co/x" },
     ] as never);
@@ -41,6 +42,8 @@ describe("start/stop", () => {
       0,
       expect.objectContaining({ format: "jpeg", quality: 60 }),
     );
+    stop();
+    expect(await save(0)).toHaveProperty("id");
     vi.useRealTimers();
   });
 
@@ -67,6 +70,27 @@ describe("start/stop", () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(captureSpy).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("skips a snapshot when the tab stopped being visible mid-capture", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    vi.spyOn(browser.tabs, "query").mockResolvedValue([
+      { id: 3, windowId: 0, url: "https://a.co/x" },
+    ] as never);
+    vi.spyOn(browser.tabs, "captureVisibleTab").mockResolvedValue(
+      JPEG_DATA_URL as never,
+    );
+    vi.spyOn(browser.tabs, "get").mockResolvedValue({
+      id: 3,
+      active: false,
+    } as never);
+
+    start();
+    await vi.advanceTimersByTimeAsync(1000);
+    stop();
+
+    expect(await save(3)).toEqual({ error: "No replay yet" });
     vi.useRealTimers();
   });
 

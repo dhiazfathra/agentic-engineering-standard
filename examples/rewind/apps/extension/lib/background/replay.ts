@@ -4,6 +4,7 @@ import { REPLAY_MS } from "../buffer";
 import { putDraft, putSnapshot, pruneSnapshots, snapshotsFor } from "../drafts";
 import type { Span } from "../timeline";
 import * as buffer from "./buffer";
+import { captureTab } from "./screenshot";
 
 const TICK_MS = 1000;
 const JPEG_QUALITY = 60;
@@ -28,11 +29,10 @@ async function tick(): Promise<void> {
     ) {
       return;
     }
-    const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, {
+    const blob = await captureTab(tab.id, tab.windowId, {
       format: "jpeg",
       quality: JPEG_QUALITY,
     });
-    const blob = await (await fetch(dataUrl)).blob();
     const now = Date.now();
     await putSnapshot({ tabId: tab.id, at: now, blob });
     await pruneSnapshots(now - REPLAY_MS);

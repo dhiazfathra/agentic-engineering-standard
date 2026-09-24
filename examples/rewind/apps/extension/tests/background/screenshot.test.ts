@@ -15,7 +15,7 @@ beforeEach(() => {
 
 describe("takeScreenshot", () => {
   it("captures the tab, saves a draft, and opens the editor", async () => {
-    await fakeBrowser.tabs.update(0, { url: "https://a.co/x" });
+    await fakeBrowser.tabs.update(0, { url: "https://a.co/x", active: true });
     vi.spyOn(browser.tabs, "captureVisibleTab").mockResolvedValue(
       PNG_DATA_URL as never,
     );
@@ -37,7 +37,7 @@ describe("takeScreenshot", () => {
   it("waits the requested delay", async () => {
     // Fakes only setTimeout/clearTimeout: Date and Node's fetch internals stay real.
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    await fakeBrowser.tabs.update(0, { url: "https://a.co/x" });
+    await fakeBrowser.tabs.update(0, { url: "https://a.co/x", active: true });
     vi.spyOn(browser.tabs, "captureVisibleTab").mockResolvedValue(
       PNG_DATA_URL as never,
     );
@@ -47,6 +47,25 @@ describe("takeScreenshot", () => {
     await vi.advanceTimersByTimeAsync(3000);
     await expect(promise).resolves.toEqual(expect.any(String));
     vi.useRealTimers();
+  });
+
+  it("refuses when the user switched tabs during the delay", async () => {
+    await fakeBrowser.tabs.update(0, { url: "https://a.co/x" });
+    vi.spyOn(browser.tabs, "captureVisibleTab").mockResolvedValue(
+      PNG_DATA_URL as never,
+    );
+    vi.spyOn(browser.tabs, "get").mockResolvedValue({
+      id: 0,
+      windowId: 0,
+      url: "https://a.co/x",
+      active: false,
+    } as never);
+    const createSpy = vi.spyOn(browser.tabs, "create");
+
+    await expect(takeScreenshot(0, "off")).rejects.toThrow(
+      "The tab is no longer visible",
+    );
+    expect(createSpy).not.toHaveBeenCalled();
   });
 
   it("refuses a non-http(s) tab", async () => {

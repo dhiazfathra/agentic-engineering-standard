@@ -29,9 +29,54 @@ describe("defaultTitle", () => {
   it("names a recording", () => {
     expect(defaultTitle("video", "https://a.co/x")).toBe("Recording of a.co/x");
   });
+
+  it("cuts a long path to the 200-character title limit", () => {
+    expect(
+      defaultTitle("screenshot", `https://a.co/${"p".repeat(300)}`),
+    ).toHaveLength(200);
+  });
 });
 
+function okFetch() {
+  return vi
+    .fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        url: "https://minio/put-url",
+        key: "rewinds/aaaaaaaaaaaaaaaaaaaaa.png",
+      }),
+    })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "r1" }) });
+}
+
 describe("fileDraft", () => {
+  it("builds the viewer link against an app URL with a trailing slash", async () => {
+    vi.stubGlobal("fetch", okFetch());
+    const result = await fileDraft({
+      appUrl: "https://a.co/",
+      blob: new Blob(["x"]),
+      contentType: "image/png",
+      rewind: rewind(),
+    });
+    expect(result.viewerUrl).toBe("https://a.co/r/r1");
+  });
+
+  it("drops the hash and cuts the page URL to the 2048-character limit", async () => {
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    await fileDraft({
+      appUrl: "https://a.co",
+      blob: new Blob(["x"]),
+      contentType: "image/png",
+      rewind: rewind({ url: `https://a.co/x?q=${"a".repeat(3000)}#frag` }),
+    });
+    const body = JSON.parse(fetchMock.mock.calls[2]![1].body);
+    expect(body.url).toHaveLength(2048);
+    expect(body.url).not.toContain("#");
+  });
+
   it("throws on an invalid rewind before any fetch", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

@@ -5,7 +5,7 @@ import { deleteDraft, getDraft, type Draft } from "../../lib/drafts";
 import { encodeFrames, exportImage, remux } from "../../lib/media";
 import { applyTheme } from "../../lib/theme";
 import { trimEvents } from "../../lib/timeline";
-import { defaultTitle, fileDraft } from "../../lib/upload";
+import { defaultTitle, fileDraft, TITLE_MAX } from "../../lib/upload";
 import { settings, updateSettings } from "../../lib/settings";
 import styles from "./editor.module.css";
 
@@ -403,6 +403,7 @@ export default function Editor() {
               draft!.url,
             )}
             value={title}
+            maxLength={TITLE_MAX}
             onChange={(e) => setTitle(e.target.value)}
           />
 

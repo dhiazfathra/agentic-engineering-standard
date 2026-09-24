@@ -3,6 +3,7 @@ import { browser } from "wxt/browser";
 import { deleteDraft, listDrafts, type Draft } from "../../lib/drafts";
 import { send, type RecordMode } from "../../lib/messages";
 import {
+  DEFAULTS,
   settings as settingsItem,
   updateSettings,
   resetSettings,
@@ -765,7 +766,9 @@ export default function App() {
                 type="button"
                 className={styles.resetButton}
                 onClick={() =>
-                  void resetSettings().then(() => settingsItem.getValue())
+                  void resetSettings().then(() =>
+                    setAppUrlDraft(DEFAULTS.appUrl),
+                  )
                 }
               >
                 Reset
