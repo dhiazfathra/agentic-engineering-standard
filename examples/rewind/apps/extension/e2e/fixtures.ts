@@ -79,8 +79,9 @@ export async function openFixture(context: BrowserContext): Promise<Page> {
 
 /**
  * Sends a message to the background from an extension page, targeting the
- * fixture tab. Brings the fixture to front first: `captureVisibleTab` needs
- * it active in its window.
+ * fixture tab. Brings the fixture to front after opening the helper tab:
+ * `captureVisibleTab` needs it active in its window, as it is when a user
+ * clicks the popup.
  */
 export async function sendToFixture(
   context: BrowserContext,
@@ -88,9 +89,9 @@ export async function sendToFixture(
   fixture: Page,
   message: Record<string, unknown>,
 ): Promise<unknown> {
-  await fixture.bringToFront();
   const helper = await context.newPage();
   await helper.goto(`chrome-extension://${extensionId}/popup.html`);
+  await fixture.bringToFront();
   const [fixtureTab] = await helper.evaluate(() =>
     chrome.tabs.query({ url: "http://localhost:3300/*" }),
   );
