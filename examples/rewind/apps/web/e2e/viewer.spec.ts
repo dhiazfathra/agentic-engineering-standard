@@ -34,7 +34,7 @@ test.describe("viewer", () => {
     await page.locator('[class*="eventRow"]').first().click();
     await expect(page.getByText("0:00 / 0:42")).toBeVisible();
     await page.locator('[class*="eventRow"]').nth(1).click();
-    await expect(page.getByText(/0:0\d \/ 0:42/)).toBeVisible();
+    await expect(page.getByText("0:02 / 0:42")).toBeVisible();
   });
 
   test("Copy link puts the origin + /r/seed-r1 on the clipboard", async ({

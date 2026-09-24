@@ -246,6 +246,11 @@
   border: none;
 }
 
+.draftPost:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .player {
   display: flex;
   align-items: center;

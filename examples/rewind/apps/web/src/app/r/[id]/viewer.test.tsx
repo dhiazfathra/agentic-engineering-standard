@@ -541,6 +541,71 @@ describe("comments", () => {
     expect(container.textContent).toContain("Comments 2");
   });
 
+  it("sends one request and disables Post while a click is already in flight", async () => {
+    localStorage.setItem("rewind:comment-author", "Dhiaz Fathra");
+    let resolveFetch!: (res: Response) => void;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    mount(
+      <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
+    );
+    const toggle = qAll("button").find((b) => b.textContent === "Comment")!;
+    click(toggle);
+    const frame = q('[class*="mediaFrame"]');
+    vi.spyOn(frame, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 100,
+      right: 100,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    act(() => {
+      frame.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, clientX: 10, clientY: 20 }),
+      );
+    });
+    const textInput = q('input[aria-label="Comment text"]') as HTMLInputElement;
+    type(textInput, "Hello");
+    const postButton = qAll("button").find(
+      (b) => b.textContent === "Post",
+    )! as HTMLButtonElement;
+
+    // Two quick clicks before the first request resolves.
+    click(postButton);
+    click(postButton);
+    expect(postButton.disabled).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFetch(
+        new Response(
+          JSON.stringify({
+            id: "c1",
+            rewindId: "seed-r1",
+            t: 5,
+            x: 10,
+            y: 20,
+            author: "Dhiaz Fathra",
+            text: "Hello",
+            createdAt: new Date().toISOString(),
+          }),
+          { status: 201, headers: { "content-type": "application/json" } },
+        ),
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("Comment added");
+  });
+
   it("shows an error toast and keeps the draft when posting fails", async () => {
     localStorage.setItem("rewind:comment-author", "Dhiaz Fathra");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

@@ -71,6 +71,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
   const [rememberedAuthor, setRememberedAuthor] = useState(readStoredAuthor);
   const [authorName, setAuthorName] = useState(rememberedAuthor);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [posting, setPosting] = useState(false);
   const mediaRef = useRef<HTMLVideoElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,7 +162,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
     // Only called from the draft popover, which renders only while `draft`
     // is set, so `draft` is always non-null here.
     const at = draft!;
-    if (!draftText.trim()) return;
+    if (posting || !draftText.trim()) return;
     const author = authorName.trim();
     if (!author) {
       showToast({ text: "Enter your name to comment", tone: "error" });
@@ -174,6 +175,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
       author,
       text: draftText.trim(),
     };
+    setPosting(true);
     try {
       const res = await fetch(`/api/rewinds/${rewind.id}/comments`, {
         method: "POST",
@@ -192,6 +194,8 @@ export function Viewer({ rewind, mediaUrl }: Props) {
       showToast({ text: "Comment added", tone: "ok" });
     } catch {
       showToast({ text: "Could not post comment", tone: "error" });
+    } finally {
+      setPosting(false);
     }
   };
 
@@ -367,6 +371,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                     type="button"
                     className={styles.draftPost}
                     onClick={() => void postDraft()}
+                    disabled={posting}
                   >
                     Post
                   </button>
