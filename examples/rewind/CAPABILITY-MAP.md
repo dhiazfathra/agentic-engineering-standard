@@ -1,5 +1,12 @@
 # Capability Map: Rewind v1
 
+> **Superseded on scope**: `SPEC-design-parity.md` (2026-09-25) is the
+> current source of truth for what's in scope, not this file. It pulls
+> every "deferred" item below (accounts, workspaces, billing, AI,
+> integrations, settings, etc.) into scope, built behind feature flags
+> where there's no real backend yet. This file still describes the
+> original v1 module breakdown and specs.
+
 Rewind is a jam.dev-style bug reporter. The extension captures the page (a
 screenshot or a video) together with its console, network and user events.
 The web app stores each capture as a Rewind and shows it as a shareable
