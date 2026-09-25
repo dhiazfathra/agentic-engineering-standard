@@ -1,6 +1,10 @@
+import { eq } from "drizzle-orm";
 import { cache } from "react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { workspaces } from "@/db/schema";
+import { db } from "@/lib/db";
+import { getPageSession } from "@/lib/auth";
 import { getRewind as getRewindUncached } from "@/lib/rewinds";
 import { mediaUrl } from "@/lib/storage";
 import { Viewer } from "./viewer";
@@ -21,5 +25,17 @@ export default async function RewindPage({ params }: Props) {
   const { id } = await params;
   const rewind = await getRewind(id);
   if (!rewind) notFound();
+
+  const session = await getPageSession();
+  if (session?.workspace.id !== rewind.workspaceId) {
+    const workspace = await db.query.workspaces.findFirst({
+      where: eq(workspaces.id, rewind.workspaceId),
+    });
+    if (workspace?.defaultLinkAccess !== "anyone") {
+      if (!session) redirect("/login");
+      notFound();
+    }
+  }
+
   return <Viewer rewind={rewind} mediaUrl={await mediaUrl(rewind.mediaKey)} />;
 }

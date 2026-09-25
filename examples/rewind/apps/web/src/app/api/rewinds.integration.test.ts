@@ -21,14 +21,40 @@ const foldersRoute = await import("./folders/route");
 const folderIdRoute = await import("./folders/[id]/route");
 const linksRoute = await import("./recording-links/route");
 const { seed } = await import("@/db/seed");
+const { createSession } = await import("@/lib/auth");
+const { users, memberships, DEFAULT_WORKSPACE_ID } = await import(
+  "@/db/schema"
+);
 
 beforeAll(async () => {
   await migrate(db, { migrationsFolder: "drizzle" });
 });
 
+let sessionCookie = "";
+
+// The migration seeds a fixed-id default workspace so pre-existing rows
+// (and unscoped routes not yet touched by this chunk, like folders and
+// recording-links) resolve to it; joining that workspace here keeps
+// everything under one workspace like a pre-multi-tenant install would be.
+beforeAll(async () => {
+  await db.insert(users).values({
+    id: "u1",
+    email: "sam@example.com",
+    passwordHash: "x",
+    firstName: "Sam",
+    lastName: "Doe",
+  });
+  await db
+    .insert(memberships)
+    .values({ workspaceId: DEFAULT_WORKSPACE_ID, userId: "u1", role: "Admin" });
+  const token = await createSession("u1", DEFAULT_WORKSPACE_ID);
+  sessionCookie = `rw_session=${token}`;
+});
+
 const jsonRequest = (url: string, method: string, body?: unknown) =>
   new Request(url, {
     method,
+    headers: { cookie: sessionCookie },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 
@@ -49,7 +75,9 @@ describe("rewinds API against a real database", () => {
     expect(linkRes.status).toBe(201);
     const link = await linkRes.json();
 
-    const linkListRes = await linksRoute.GET();
+    const linkListRes = await linksRoute.GET(
+      new Request("http://localhost", { headers: { cookie: sessionCookie } }),
+    );
     expect(linkListRes.status).toBe(200);
     expect(await linkListRes.json()).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: link.id })]),
@@ -92,7 +120,9 @@ describe("rewinds API against a real database", () => {
     expect(await dupRes.json()).toEqual({ error: "mediaKey already used" });
 
     // List, with errorCount as a correlated count of isError events
-    const listRes = await rewindsRoute.GET();
+    const listRes = await rewindsRoute.GET(
+      new Request("http://localhost", { headers: { cookie: sessionCookie } }),
+    );
     expect(listRes.status).toBe(200);
     const list = await listRes.json();
     expect(list.map((r: { id: string }) => r.id)).toContain(rewind.id);
@@ -102,7 +132,7 @@ describe("rewinds API against a real database", () => {
 
     // Get with events sorted by t
     const params = Promise.resolve({ id: rewind.id as string });
-    const getRes = await rewindIdRoute.GET(new Request("http://localhost"), {
+    const getRes = await rewindIdRoute.GET(new Request("http://localhost", { headers: { cookie: sessionCookie } }), {
       params,
     });
     expect(getRes.status).toBe(200);
@@ -137,13 +167,13 @@ describe("rewinds API against a real database", () => {
     // Delete the folder: rewind's folderId becomes null
     const folderParams = Promise.resolve({ id: folder.id as string });
     const deleteFolderRes = await folderIdRoute.DELETE(
-      new Request("http://localhost"),
+      new Request("http://localhost", { headers: { cookie: sessionCookie } }),
       { params: folderParams },
     );
     expect(deleteFolderRes.status).toBe(200);
 
     const afterFolderDeleteRes = await rewindIdRoute.GET(
-      new Request("http://localhost"),
+      new Request("http://localhost", { headers: { cookie: sessionCookie } }),
       { params },
     );
     expect((await afterFolderDeleteRes.json()).folderId).toBeNull();
@@ -152,7 +182,7 @@ describe("rewinds API against a real database", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     s3Send.mockRejectedValueOnce(new Error("ECONNREFUSED"));
     const deleteRes = await rewindIdRoute.DELETE(
-      new Request("http://localhost"),
+      new Request("http://localhost", { headers: { cookie: sessionCookie } }),
       { params },
     );
     expect(deleteRes.status).toBe(200);
@@ -161,7 +191,7 @@ describe("rewinds API against a real database", () => {
 
     // Get now 404s, events/comments gone
     const afterDeleteRes = await rewindIdRoute.GET(
-      new Request("http://localhost"),
+      new Request("http://localhost", { headers: { cookie: sessionCookie } }),
       { params },
     );
     expect(afterDeleteRes.status).toBe(404);
@@ -273,7 +303,11 @@ describe("rewinds API against a real database", () => {
       updatedAt: patched.updatedAt,
     });
 
-    const folderList = await (await foldersRoute.GET()).json();
+    const folderList = await (
+      await foldersRoute.GET(
+        new Request("http://localhost", { headers: { cookie: sessionCookie } }),
+      )
+    ).json();
     expect(folderList).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

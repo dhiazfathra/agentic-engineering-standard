@@ -1,9 +1,10 @@
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { updateRewind } from "@rewind/schema";
-import { rewinds } from "@/db/schema";
+import { rewinds, workspaces } from "@/db/schema";
 import { db } from "@/lib/db";
+import { getSession, notFound } from "@/lib/auth";
 import { isForeignKeyViolation, parseBody } from "@/lib/http";
 import { env } from "@/lib/env";
 import { getRewind } from "@/lib/rewinds";
@@ -13,17 +14,35 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
   const { id } = await params;
   const row = await getRewind(id);
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const session = await getSession(req);
+  if (session?.workspace.id !== row.workspaceId) {
+    const workspace = await db.query.workspaces.findFirst({
+      where: eq(workspaces.id, row.workspaceId),
+    });
+    if (workspace?.defaultLinkAccess !== "anyone") {
+      if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      // Cross-workspace: hide that the row exists.
+      return notFound();
+    }
   }
   return NextResponse.json(row);
 }
 
 export async function PATCH(req: Request, { params }: Params) {
   const { id } = await params;
+  const session = await getSession(req);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const parsed = await parseBody(req, updateRewind);
   if (parsed instanceof NextResponse) return parsed;
 
@@ -31,10 +50,12 @@ export async function PATCH(req: Request, { params }: Params) {
     const [row] = await db
       .update(rewinds)
       .set({ ...parsed, updatedAt: new Date() })
-      .where(eq(rewinds.id, id))
+      .where(
+        and(eq(rewinds.id, id), eq(rewinds.workspaceId, session.workspace.id)),
+      )
       .returning();
     if (!row) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return notFound();
     }
     return NextResponse.json(row);
   } catch (error) {
@@ -45,12 +66,22 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params }: Params) {
   const { id } = await params;
-  const [row] = await db.delete(rewinds).where(eq(rewinds.id, id)).returning();
-  if (!row) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const session = await getSession(req);
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const [row] = await db
+    .delete(rewinds)
+    .where(
+      and(eq(rewinds.id, id), eq(rewinds.workspaceId, session.workspace.id)),
+    )
+    .returning();
+  if (!row) {
+    return notFound();
+  }
+
   try {
     await s3.send(
       new DeleteObjectCommand({ Bucket: env.S3_BUCKET, Key: row.mediaKey }),

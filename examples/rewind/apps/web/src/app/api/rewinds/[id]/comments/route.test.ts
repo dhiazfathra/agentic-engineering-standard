@@ -7,8 +7,20 @@ function chain(resolved: unknown) {
   return obj;
 }
 
-const mocks = vi.hoisted(() => ({ insert: vi.fn() }));
-vi.mock("@/lib/db", () => ({ db: { insert: mocks.insert } }));
+const session = { user: { id: "u1" }, workspace: { id: "w1" } };
+
+const mocks = vi.hoisted(() => ({
+  insert: vi.fn(),
+  findFirstRewind: vi.fn(),
+  requireSession: vi.fn(),
+}));
+vi.mock("@/lib/db", () => ({
+  db: {
+    insert: mocks.insert,
+    query: { rewinds: { findFirst: mocks.findFirstRewind } },
+  },
+}));
+vi.mock("@/lib/auth", () => ({ requireSession: mocks.requireSession }));
 
 import { POST } from "./route";
 
@@ -30,7 +42,20 @@ const request = (body: unknown) =>
   });
 
 describe("POST /api/rewinds/[id]/comments", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(session);
+    mocks.findFirstRewind.mockResolvedValue({ id: "r1", workspaceId: "w1" });
+  });
+
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    mocks.requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await POST(request(validBody), { params });
+    expect(res.status).toBe(401);
+  });
 
   it("creates a comment", async () => {
     mocks.insert.mockReturnValue(chain([row]));
@@ -44,7 +69,14 @@ describe("POST /api/rewinds/[id]/comments", () => {
     expect(res.status).toBe(400);
   });
 
-  it("404s when the rewind does not exist", async () => {
+  it("404s when the rewind does not exist or belongs to another workspace", async () => {
+    mocks.findFirstRewind.mockResolvedValue(undefined);
+    const res = await POST(request(validBody), { params });
+    expect(res.status).toBe(404);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it("404s on a foreign-key violation from the insert itself", async () => {
     const error = new Error("FK") as Error & { extendedCode: string };
     error.extendedCode = "SQLITE_CONSTRAINT_FOREIGNKEY";
     const obj: Record<string, unknown> = {};

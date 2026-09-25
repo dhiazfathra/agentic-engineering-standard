@@ -1,5 +1,5 @@
 import { asc, desc, eq, sql } from "drizzle-orm";
-import { comments, events, rewinds } from "@/db/schema";
+import { comments, events, folders, rewinds } from "@/db/schema";
 import { db } from "@/lib/db";
 
 /** The row shape shared by `GET /api/rewinds/[id]` and the viewer page. */
@@ -16,17 +16,18 @@ export async function getRewind(id: string) {
 export type RewindDetail = NonNullable<Awaited<ReturnType<typeof getRewind>>>;
 
 /**
- * Every Rewind, newest first, with `errorCount`: a correlated count of its
- * `isError` events, in one query (no N+1). Shared by the library page and
- * `GET /api/rewinds`.
+ * Every Rewind in a workspace, newest first, with `errorCount`: a correlated
+ * count of its `isError` events, in one query (no N+1). Shared by the
+ * library page and `GET /api/rewinds`.
  *
  * ponytail: no pagination, one query loads every row — fine for a few
  * hundred Rewinds; add LIMIT/cursor pagination past that ceiling.
  */
-export async function listRewinds() {
+export async function listRewinds(workspaceId: string) {
   return db
     .select({
       id: rewinds.id,
+      workspaceId: rewinds.workspaceId,
       title: rewinds.title,
       url: rewinds.url,
       reporterName: rewinds.reporterName,
@@ -36,6 +37,7 @@ export async function listRewinds() {
       durationSeconds: rewinds.durationSeconds,
       folderId: rewinds.folderId,
       recordingLinkId: rewinds.recordingLinkId,
+      errorSignature: rewinds.errorSignature,
       createdAt: rewinds.createdAt,
       updatedAt: rewinds.updatedAt,
       // A single-table select strips table names from interpolated columns,
@@ -47,14 +49,17 @@ export async function listRewinds() {
       )`.mapWith(Number),
     })
     .from(rewinds)
+    .where(eq(rewinds.workspaceId, workspaceId))
     .orderBy(desc(rewinds.createdAt));
 }
 
 export type RewindListItem = Awaited<ReturnType<typeof listRewinds>>[number];
 
-/** Every folder. Shared by the library page and `GET /api/folders`. */
-export async function listFolders() {
-  return db.query.folders.findMany();
+/** Every folder in a workspace. Shared by the library page and `GET /api/folders`. */
+export async function listFolders(workspaceId: string) {
+  return db.query.folders.findMany({
+    where: eq(folders.workspaceId, workspaceId),
+  });
 }
 
 export type FolderListItem = Awaited<ReturnType<typeof listFolders>>[number];

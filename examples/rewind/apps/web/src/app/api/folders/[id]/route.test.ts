@@ -7,14 +7,21 @@ function chain(resolved: unknown) {
   return obj;
 }
 
-const mocks = vi.hoisted(() => ({ update: vi.fn(), delete: vi.fn() }));
+const session = { user: { id: "u1" }, workspace: { id: "w1" } };
+
+const mocks = vi.hoisted(() => ({
+  update: vi.fn(),
+  delete: vi.fn(),
+  requireSession: vi.fn(),
+}));
 vi.mock("@/lib/db", () => ({
   db: { update: mocks.update, delete: mocks.delete },
 }));
+vi.mock("@/lib/auth", () => ({ requireSession: mocks.requireSession }));
 
 import { DELETE, PATCH } from "./route";
 
-const row = { id: "f1", name: "Bugs", createdAt: new Date() };
+const row = { id: "f1", workspaceId: "w1", name: "Bugs", createdAt: new Date() };
 const params = Promise.resolve({ id: "f1" });
 const patchRequest = (body: unknown) =>
   new Request("http://localhost/api/folders/f1", {
@@ -23,7 +30,19 @@ const patchRequest = (body: unknown) =>
   });
 
 describe("PATCH /api/folders/[id]", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(session);
+  });
+
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    mocks.requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await PATCH(patchRequest({ name: "New" }), { params });
+    expect(res.status).toBe(401);
+  });
 
   it("renames the folder", async () => {
     mocks.update.mockReturnValue(chain([row]));
@@ -31,7 +50,7 @@ describe("PATCH /api/folders/[id]", () => {
     expect(res.status).toBe(200);
   });
 
-  it("404s when missing", async () => {
+  it("404s when missing or cross-workspace", async () => {
     mocks.update.mockReturnValue(chain([]));
     const res = await PATCH(patchRequest({ name: "New" }), { params });
     expect(res.status).toBe(404);
@@ -44,7 +63,19 @@ describe("PATCH /api/folders/[id]", () => {
 });
 
 describe("DELETE /api/folders/[id]", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(session);
+  });
+
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    mocks.requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await DELETE(new Request("http://localhost"), { params });
+    expect(res.status).toBe(401);
+  });
 
   it("deletes the folder", async () => {
     mocks.delete.mockReturnValue(chain([row]));
@@ -53,7 +84,7 @@ describe("DELETE /api/folders/[id]", () => {
     expect(await res.json()).toEqual({ id: "f1" });
   });
 
-  it("404s when missing", async () => {
+  it("404s when missing or cross-workspace", async () => {
     mocks.delete.mockReturnValue(chain([]));
     const res = await DELETE(new Request("http://localhost"), { params });
     expect(res.status).toBe(404);

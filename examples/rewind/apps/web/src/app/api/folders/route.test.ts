@@ -7,8 +7,15 @@ function chain(resolved: unknown) {
   return obj;
 }
 
-const mocks = vi.hoisted(() => ({ listFolders: vi.fn(), insert: vi.fn() }));
+const session = { user: { id: "u1" }, workspace: { id: "w1" } };
+
+const mocks = vi.hoisted(() => ({
+  listFolders: vi.fn(),
+  insert: vi.fn(),
+  requireSession: vi.fn(),
+}));
 vi.mock("@/lib/rewinds", () => ({ listFolders: mocks.listFolders }));
+vi.mock("@/lib/auth", () => ({ requireSession: mocks.requireSession }));
 vi.mock("@/lib/db", () => ({
   db: {
     insert: mocks.insert,
@@ -17,7 +24,7 @@ vi.mock("@/lib/db", () => ({
 
 import { GET, POST } from "./route";
 
-const row = { id: "f1", name: "Bugs", createdAt: new Date() };
+const row = { id: "f1", workspaceId: "w1", name: "Bugs", createdAt: new Date() };
 const request = (body: unknown) =>
   new Request("http://localhost/api/folders", {
     method: "POST",
@@ -25,12 +32,25 @@ const request = (body: unknown) =>
   });
 
 describe("GET /api/folders", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(session);
+  });
 
-  it("lists folders", async () => {
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    mocks.requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await GET(new Request("http://localhost/api/folders"));
+    expect(res.status).toBe(401);
+  });
+
+  it("lists the session's workspace folders", async () => {
     mocks.listFolders.mockResolvedValue([row]);
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/folders"));
     expect(res.status).toBe(200);
+    expect(mocks.listFolders).toHaveBeenCalledWith("w1");
     expect(await res.json()).toEqual([
       { ...row, createdAt: row.createdAt.toISOString() },
     ]);
@@ -38,9 +58,21 @@ describe("GET /api/folders", () => {
 });
 
 describe("POST /api/folders", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(session);
+  });
 
-  it("creates a folder", async () => {
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    mocks.requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await POST(request({ name: "Bugs" }));
+    expect(res.status).toBe(401);
+  });
+
+  it("creates a folder scoped to the session's workspace", async () => {
     mocks.insert.mockReturnValue(chain([row]));
     const res = await POST(request({ name: "Bugs" }));
     expect(res.status).toBe(201);

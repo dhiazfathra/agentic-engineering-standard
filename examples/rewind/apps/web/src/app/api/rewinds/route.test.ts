@@ -9,18 +9,32 @@ function chain(resolved: unknown) {
   return obj;
 }
 
+const session = {
+  user: { id: "u1" },
+  workspace: { id: "w1" },
+  membership: { role: "Admin" },
+};
+
 const mocks = vi.hoisted(() => ({
   listRewinds: vi.fn(),
   insert: vi.fn(),
   batch: vi.fn(),
+  findFirstFolder: vi.fn(),
+  findFirstRecordingLink: vi.fn(),
+  requireSession: vi.fn(),
 }));
 
 vi.mock("@/lib/rewinds", () => ({ listRewinds: mocks.listRewinds }));
+vi.mock("@/lib/auth", () => ({ requireSession: mocks.requireSession }));
 
 vi.mock("@/lib/db", () => ({
   db: {
     insert: mocks.insert,
     batch: mocks.batch,
+    query: {
+      folders: { findFirst: mocks.findFirstFolder },
+      recordingLinks: { findFirst: mocks.findFirstRecordingLink },
+    },
   },
 }));
 
@@ -28,6 +42,7 @@ import { GET, POST } from "./route";
 
 const row = {
   id: "r1",
+  workspaceId: "w1",
   title: "Bug",
   url: "https://x",
   reporterName: "A",
@@ -37,6 +52,7 @@ const row = {
   durationSeconds: null,
   folderId: null,
   recordingLinkId: null,
+  errorSignature: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -48,12 +64,27 @@ const request = (body: unknown) =>
   });
 
 describe("GET /api/rewinds", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(session);
+  });
 
-  it("lists rewinds newest first with errorCount", async () => {
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    const unauthorized = NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 },
+    );
+    mocks.requireSession.mockResolvedValue(unauthorized);
+    const res = await GET(new Request("http://localhost/api/rewinds"));
+    expect(res.status).toBe(401);
+  });
+
+  it("lists the session's workspace rewinds newest first with errorCount", async () => {
     mocks.listRewinds.mockResolvedValue([{ ...row, errorCount: 2 }]);
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/rewinds"));
     expect(res.status).toBe(200);
+    expect(mocks.listRewinds).toHaveBeenCalledWith("w1");
     expect(await res.json()).toEqual([
       {
         ...row,
@@ -66,7 +97,12 @@ describe("GET /api/rewinds", () => {
 });
 
 describe("POST /api/rewinds", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(session);
+    mocks.findFirstFolder.mockResolvedValue({ id: "f1" });
+    mocks.findFirstRecordingLink.mockResolvedValue({ id: "l1" });
+  });
 
   const validBody = {
     title: "Bug",
@@ -76,6 +112,15 @@ describe("POST /api/rewinds", () => {
     mediaKey: "rewinds/aaaaaaaaaaaaaaaaaaaaa.png",
     events: [{ t: 1, kind: "click", text: "clicked", isError: false }],
   };
+
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    mocks.requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await POST(request(validBody));
+    expect(res.status).toBe(401);
+  });
 
   it("creates a rewind and its events in one batch", async () => {
     mocks.insert.mockReturnValue(chain(undefined));
@@ -105,12 +150,27 @@ describe("POST /api/rewinds", () => {
     expect(res.status).toBe(400);
   });
 
-  it("400s when folderId or recordingLinkId is unknown", async () => {
+  it("400s when folderId belongs to another workspace (or doesn't exist)", async () => {
+    mocks.findFirstFolder.mockResolvedValue(undefined);
+    const res = await POST(request({ ...validBody, folderId: "other-ws" }));
+    expect(res.status).toBe(400);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it("400s when recordingLinkId belongs to another workspace (or doesn't exist)", async () => {
+    mocks.findFirstRecordingLink.mockResolvedValue(undefined);
+    const res = await POST(
+      request({ ...validBody, recordingLinkId: "other-ws" }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400s on a foreign-key violation from the insert itself", async () => {
     mocks.insert.mockReturnValue(chain(undefined));
     const error = new Error("FK") as Error & { extendedCode: string };
     error.extendedCode = "SQLITE_CONSTRAINT_FOREIGNKEY";
     mocks.batch.mockRejectedValue(error);
-    const res = await POST(request({ ...validBody, folderId: "missing" }));
+    const res = await POST(request(validBody));
     expect(res.status).toBe(400);
   });
 
