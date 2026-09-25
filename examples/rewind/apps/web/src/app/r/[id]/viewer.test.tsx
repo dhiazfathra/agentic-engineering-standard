@@ -8,6 +8,7 @@ import { Viewer } from "./viewer";
 function videoRewind(): RewindDetail {
   return {
     id: "seed-r1",
+    workspaceId: "w1",
     title: "Checkout fails after applying coupon",
     url: "https://shop.acme.co/cart",
     reporterName: "Maya Chen",
@@ -17,6 +18,7 @@ function videoRewind(): RewindDetail {
     durationSeconds: 42,
     folderId: null,
     recordingLinkId: null,
+    errorSignature: null,
     createdAt: new Date(Date.now() - 5 * 60_000),
     updatedAt: new Date(),
     events: [

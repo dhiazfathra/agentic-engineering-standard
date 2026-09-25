@@ -8,7 +8,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import * as schema from "./schema";
-import { comments, events, folders, recordingLinks, rewinds } from "./schema";
+import {
+  accessTokens,
+  comments,
+  events,
+  folders,
+  integrations,
+  invites,
+  memberships,
+  recordingLinks,
+  rewinds,
+  sessions,
+  supportMessages,
+  users,
+  workspaces,
+} from "./schema";
 
 // :memory: gives libSQL a fresh DB per connection, so use a temp file.
 const dbFile = join(mkdtempSync(join(tmpdir(), "rewind-db-")), "test.db");
@@ -133,6 +147,21 @@ describe("foreign key targets", () => {
     expect(
       getTableConfig(comments).foreignKeys[0]?.reference().foreignTable,
     ).toBe(rewinds);
+  });
+
+  it("points every accounts/workspaces FK at the right table", () => {
+    const targetsOf = (t: Parameters<typeof getTableConfig>[0]) =>
+      getTableConfig(t).foreignKeys.map((fk) => fk.reference().foreignTable);
+
+    expect(targetsOf(memberships)).toEqual([workspaces, users]);
+    expect(targetsOf(invites)).toEqual([workspaces]);
+    expect(targetsOf(sessions)).toEqual([users, workspaces]);
+    expect(targetsOf(accessTokens)).toEqual([users]);
+    expect(targetsOf(integrations)).toEqual([workspaces]);
+    expect(targetsOf(supportMessages)).toEqual([users]);
+    expect(targetsOf(folders)).toEqual([workspaces]);
+    expect(targetsOf(recordingLinks)).toEqual([workspaces]);
+    expect(targetsOf(rewinds)).toContain(workspaces);
   });
 });
 

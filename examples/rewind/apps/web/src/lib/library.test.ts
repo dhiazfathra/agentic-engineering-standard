@@ -174,6 +174,7 @@ describe("filterPalette", () => {
 describe("libraryReducer", () => {
   const rewind = {
     id: "r1",
+    workspaceId: "w1",
     title: "Bug",
     url: "https://x",
     reporterName: "A",
@@ -187,7 +188,12 @@ describe("libraryReducer", () => {
     updatedAt: new Date(),
     errorCount: 0,
   };
-  const folder = { id: "f1", name: "Bugs", createdAt: new Date() };
+  const folder = {
+    id: "f1",
+    workspaceId: "w1",
+    name: "Bugs",
+    createdAt: new Date(),
+  };
   const state = { rewinds: [rewind], folders: [folder] };
 
   it("renames a rewind", () => {
@@ -272,6 +278,7 @@ describe("libraryReducer", () => {
   it("adds a folder", () => {
     const newFolder = {
       id: "f2",
+      workspaceId: "w1",
       name: "Untitled folder 1",
       createdAt: new Date(),
     };
