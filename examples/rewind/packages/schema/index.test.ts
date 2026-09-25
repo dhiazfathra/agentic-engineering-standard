@@ -12,7 +12,9 @@ import {
   rewindKind,
   rewindStatus,
   updateFolder,
+  updateMe,
   updateRewind,
+  updateWorkspace,
   uploadRequest,
 } from "./index";
 
@@ -369,5 +371,33 @@ describe("createRecordingLink", () => {
 
   it("rejects an empty name", () => {
     expect(createRecordingLink.safeParse({ name: "" }).success).toBe(false);
+  });
+});
+
+describe("updateWorkspace", () => {
+  it("accepts at least one field", () => {
+    expect(updateWorkspace.safeParse({ name: "Acme" }).success).toBe(true);
+  });
+
+  it("rejects an empty body", () => {
+    expect(updateWorkspace.safeParse({}).success).toBe(false);
+  });
+
+  it("rejects an unknown field", () => {
+    expect(updateWorkspace.safeParse({ nope: true }).success).toBe(false);
+  });
+});
+
+describe("updateMe", () => {
+  it("accepts at least one field", () => {
+    expect(updateMe.safeParse({ firstName: "Ada" }).success).toBe(true);
+  });
+
+  it("rejects an empty body", () => {
+    expect(updateMe.safeParse({}).success).toBe(false);
+  });
+
+  it("rejects an unknown field", () => {
+    expect(updateMe.safeParse({ nope: true }).success).toBe(false);
   });
 });
