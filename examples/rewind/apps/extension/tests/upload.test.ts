@@ -122,13 +122,18 @@ describe("fileDraft", () => {
     const [uploadUrl, uploadInit] = fetchMock.mock.calls[0]!;
     expect(String(uploadUrl)).toBe("https://a.co/api/uploads");
     expect(JSON.parse(uploadInit.body)).toEqual({ contentType: "image/png" });
+    expect(uploadInit.credentials).toBe("include");
     expect(String(fetchMock.mock.calls[2]![0])).toBe(
       "https://a.co/api/rewinds",
     );
     const putCall = fetchMock.mock.calls[1]!;
     expect(putCall[0]).toBe("https://minio/put-url");
     expect(putCall[1].headers).toEqual({ "Content-Type": "image/png" });
+    // The presigned PUT goes straight to MinIO, a different origin: it must
+    // not carry the web app's session cookie.
+    expect(putCall[1].credentials).toBeUndefined();
     const createCall = fetchMock.mock.calls[2]!;
+    expect(createCall[1].credentials).toBe("include");
     const body = JSON.parse(createCall[1].body as string);
     expect(body.mediaKey).toBe("rewinds/aaaaaaaaaaaaaaaaaaaaa.png");
   });

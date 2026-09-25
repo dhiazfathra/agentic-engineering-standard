@@ -66,6 +66,7 @@ export async function fileDraft({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contentType }),
+    credentials: "include",
   });
   await checkOk(uploadRes, "POST /api/uploads");
   const { url, key } = (await uploadRes.json()) as {
@@ -85,6 +86,7 @@ export async function fileDraft({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    credentials: "include",
   });
   await checkOk(createRes, "POST /api/rewinds");
   const created = (await createRes.json()) as { id: string };
