@@ -86,6 +86,10 @@ invalid variable.
 | `S3_ACCESS_KEY`       | `rewind`                | same                                                      |
 | `S3_SECRET_KEY`       | local-only value        | same, production only                                     |
 
+Feature flags (`NEXT_PUBLIC_FLAG_<NAME>`, all default `0`) are listed in
+`.env.example` and read by `apps/web/src/lib/flags.ts`; see
+`SPEC-design-parity.md` § Feature flags for the table.
+
 A real `S3_ENDPOINT` env var overrides the `.env.example` default for the
 web e2e suite, so MinIO can run on remapped ports when 9000 is already
 taken locally (`S3_ENDPOINT=http://localhost:9100 bun run --filter web e2e`).
