@@ -40,20 +40,20 @@ flag service, no runtime toggles. `.env.example` lists every flag set
 to `0`. A flagged element is not rendered when its flag is off; its
 route or API returns 404.
 
-| Flag                | Gates                                                                                                                                                                | Why it is gated                                                                                 |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `AI_SUMMARY`        | Viewer Summary tab's "AI summary" and "Likely root cause" blocks; editor "AI summary" toggle; Settings › General "AI" toggle; Billing "AI summaries" usage row       | No model call. Text is static.                                                                  |
-| `SIMILAR_MERGE`     | Viewer "Merge into one issue" button                                                                                                                                 | No issue entity to merge into. The similar list itself is real (same `errorSignature`).         |
-| `INTEGRATIONS`      | Settings › Integrations grid, viewer "Send to Linear", editor destination picker (all but "Link share"), Get started "Connect an integration"                         | No OAuth with Linear, Jira, GitHub or the rest. Connect state is stored, nothing is sent.       |
-| `BILLING`           | Settings › Billing, pricing overlay, "Upgrade", "Free" badge, SSO toggle (opens pricing)                                                                             | No payment provider. Usage numbers are real counts; plan and checkout are not.                  |
-| `SDK`               | Settings › Rewind SDK, the "Connect your domain" modal and its red dot, SDK Verify                                                                                   | No SDK exists. Verify always reports "not detected".                                            |
-| `CLI_MCP`           | Settings › CLI and MCP, "+ Add other MCP client", MCP modal, Install › SDK/CLI/MCP                                                                                   | No CLI or MCP server exists. Token creation itself is real (see Accounts).                      |
-| `WEBHOOKS`          | Settings › Webhooks                                                                                                                                                  | No delivery worker.                                                                             |
-| `HELPDESK`          | Helpdesk nav item and page                                                                                                                                           | Buttons only link out to Intercom and other helpdesks.                                          |
-| `SUPPORT_WIDGET`    | Support bubble, its Home, Messages, Chat and Status panels; Help › Report an issue, Contact support, System status                                                    | No support inbox or status source. Chat messages are stored, the reply is canned, bars fixed.   |
-| `EMAIL`             | Settings › Notifications toggles and "Turn off all"; invite-by-email sending                                                                                         | No mail provider. Preferences are stored; nothing is sent. Invites still work by link.          |
-| `SSO_AUDIT_AUTODEL` | Settings › General SSO, Audit logs and Auto-delete toggles                                                                                                           | Stored only. No IdP, no audit log writer, no deletion job.                                      |
-| `EXTERNAL_LINKS`    | Help › Docs, Security, Blog, Install iOS app; extension-menu Docs; "View docs"; "Contact sales"                                                                      | Target pages do not exist; the design only toasts.                                              |
+| Flag                | Gates                                                                                                                                                          | Why it is gated                                                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `AI_SUMMARY`        | Viewer Summary tab's "AI summary" and "Likely root cause" blocks; editor "AI summary" toggle; Settings › General "AI" toggle; Billing "AI summaries" usage row | No model call. Text is static.                                                                |
+| `SIMILAR_MERGE`     | Viewer "Merge into one issue" button                                                                                                                           | No issue entity to merge into. The similar list itself is real (same `errorSignature`).       |
+| `INTEGRATIONS`      | Settings › Integrations grid, viewer "Send to Linear", editor destination picker (all but "Link share"), Get started "Connect an integration"                  | No OAuth with Linear, Jira, GitHub or the rest. Connect state is stored, nothing is sent.     |
+| `BILLING`           | Settings › Billing, pricing overlay, "Upgrade", "Free" badge, SSO toggle (opens pricing)                                                                       | No payment provider. Usage numbers are real counts; plan and checkout are not.                |
+| `SDK`               | Settings › Rewind SDK, the "Connect your domain" modal and its red dot, SDK Verify                                                                             | No SDK exists. Verify always reports "not detected".                                          |
+| `CLI_MCP`           | Settings › CLI and MCP, "+ Add other MCP client", MCP modal, Install › SDK/CLI/MCP                                                                             | No CLI or MCP server exists. Token creation itself is real (see Accounts).                    |
+| `WEBHOOKS`          | Settings › Webhooks                                                                                                                                            | No delivery worker.                                                                           |
+| `HELPDESK`          | Helpdesk nav item and page                                                                                                                                     | Buttons only link out to Intercom and other helpdesks.                                        |
+| `SUPPORT_WIDGET`    | Support bubble, its Home, Messages, Chat and Status panels; Help › Report an issue, Contact support, System status                                             | No support inbox or status source. Chat messages are stored, the reply is canned, bars fixed. |
+| `EMAIL`             | Settings › Notifications toggles and "Turn off all"; invite-by-email sending                                                                                   | No mail provider. Preferences are stored; nothing is sent. Invites still work by link.        |
+| `SSO_AUDIT_AUTODEL` | Settings › General SSO, Audit logs and Auto-delete toggles                                                                                                     | Stored only. No IdP, no audit log writer, no deletion job.                                    |
+| `EXTERNAL_LINKS`    | Help › Docs, Security, Blog, Install iOS app; extension-menu Docs; "View docs"; "Contact sales"                                                                | Target pages do not exist; the design only toasts.                                            |
 
 Everything not in this table is real and ships ungated.
 
@@ -115,7 +115,7 @@ A):
   image/png|jpeg|gif, 2 MB max, same pattern as `/api/uploads`.
 - `GET /api/workspaces` (mine), `POST /api/workspaces` {name} (create
   and switch), `POST /api/workspaces/switch` {id}, `POST
-  /api/workspaces/join` {inviteUrl or code}. Invalid code: 400 "That
+/api/workspaces/join` {inviteUrl or code}. Invalid code: 400 "That
   invite link isn't valid".
 - `POST /api/workspace/invite-code/reset` (A).
 - `GET /api/members`, `PATCH/DELETE /api/members/[userId]` (A; the last
