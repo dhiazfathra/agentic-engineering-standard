@@ -164,6 +164,25 @@ it("checks the integration-connected Get-started item once the checklist opens",
   expect(item.className).toContain("getStartedDone");
 });
 
+it("leaves the integration Get-started item unchecked when the fetch fails", async () => {
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url === "/api/integrations"
+        ? new Response("error", { status: 500 })
+        : new Response("[]"),
+    ),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  render();
+  click(q('[class*="getStartedButton"]'));
+  await flush();
+  expect(fetchMock).toHaveBeenCalledWith("/api/integrations");
+  const item = qAll('[class*="getStartedCheck"]').find((b) =>
+    b.textContent?.includes("Connect an integration"),
+  )!;
+  expect(item.className).not.toContain("getStartedDone");
+});
+
 it("ignores the integration fetch if the checklist closes before it resolves", async () => {
   let resolveFetch!: (res: Response) => void;
   vi.stubGlobal(
