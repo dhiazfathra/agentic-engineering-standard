@@ -836,6 +836,20 @@ describe("webhooks tab", () => {
 });
 
 describe("account tab", () => {
+  it("falls back to 'Account' in the nav and header when the user has no name", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mount(
+      <SettingsPage
+        {...baseProps({
+          tab: "account",
+          user: user({ firstName: "", lastName: "" }),
+        })}
+      />,
+    );
+    await flush();
+    expect(container.textContent).toContain("Account");
+  });
+
   it("saves first and last name on blur when changed", async () => {
     const fetchMock = jsonFetchFor({ "PATCH /api/me": { body: {} } });
     vi.stubGlobal("fetch", fetchMock);
