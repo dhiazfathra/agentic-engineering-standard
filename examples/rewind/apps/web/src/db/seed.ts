@@ -1,14 +1,18 @@
+import { and, eq } from "drizzle-orm";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
+import { errorSignature } from "@/lib/signature";
 import { hashPassword } from "@/lib/password";
 import {
   comments,
   DEFAULT_WORKSPACE_ID,
   events,
   folders,
+  integrations,
   memberships,
   recordingLinks,
   rewinds,
   users,
+  workspaces,
 } from "./schema";
 import type * as schema from "./schema";
 
@@ -19,6 +23,55 @@ type Db = LibSQLDatabase<typeof schema>;
 export const SEED_USER_ID = "seed-user-admin";
 export const SEED_USER_EMAIL = "dhiazfathra@gmail.com";
 export const SEED_USER_PASSWORD = "rewind-dev";
+
+// SPEC-design-parity.md § Seed: the default workspace's design name and
+// invite code. The migration (drizzle/0003_accounts_workspaces.sql) inserts
+// the row named "Default Workspace" before this workspace exists; seed()
+// renames it once, only while it still has that migration default name, so
+// a later user rename sticks across re-seeds.
+export const SEED_WORKSPACE_NAME = "Dhiaz's Workspace";
+const SEED_WORKSPACE_INVITE_CODE = "RsSg6prV8T8";
+const MIGRATION_DEFAULT_WORKSPACE_NAME = "Default Workspace";
+
+// Design's other members, all password rewind-dev.
+const MEMBERS = [
+  {
+    id: "seed-user-maya",
+    email: "maya@acme.co",
+    firstName: "Maya",
+    lastName: "Chen",
+    role: "Creator",
+  },
+  {
+    id: "seed-user-leo",
+    email: "leo@acme.co",
+    firstName: "Leo",
+    lastName: "Park",
+    role: "Creator",
+  },
+  {
+    id: "seed-user-sara",
+    email: "sara@acme.co",
+    firstName: "Sara",
+    lastName: "Ali",
+    role: "Viewer",
+  },
+] as const;
+
+const MEMBER_PASSWORD = "rewind-dev";
+
+// Design's connected integrations.
+const INTEGRATIONS = ["Linear", "Slack"] as const;
+
+// A mix of distinct errors for the recording-link filler Rewinds, so each
+// link's Rewinds group into more than one errorSignature.
+const FILLER_ERRORS = [
+  "TypeError: Cannot read properties of null (reading 'items')",
+  "ReferenceError: total is not defined",
+  "RangeError: Invalid array length",
+  "TypeError: fetch failed",
+  "SyntaxError: Unexpected token < in JSON at position 0",
+] as const;
 
 const FOLDER_IDS = {
   Checkout: "seed-folder-checkout",
@@ -31,7 +84,15 @@ const LINK_IDS = {
   "Beta testers": "seed-link-beta-testers",
 } as const;
 
-// Design's JAMS, from docs/design/Rewind.dc.html.
+// Design's recording-link recording counts (SPEC-design-parity.md § Seed).
+// JAMS below supplies 4 Rewinds per link; buildFillerRows tops each up.
+const LINK_TARGET_COUNTS: Record<keyof typeof LINK_IDS, number> = {
+  "Support: checkout issues": 6,
+  "Beta testers": 14,
+};
+
+// Design's JAMS, from docs/design/Rewind.dc.html. `link` assigns each to
+// the recording link it came through (SPEC-design-parity.md § Seed).
 const JAMS = [
   {
     id: "r1",
@@ -42,6 +103,7 @@ const JAMS = [
     dur: "0:42",
     status: "new",
     folder: "Checkout",
+    link: "Support: checkout issues",
   },
   {
     id: "r2",
@@ -52,6 +114,7 @@ const JAMS = [
     dur: "0:31",
     status: "new",
     folder: "Mobile web",
+    link: "Support: checkout issues",
   },
   {
     id: "r3",
@@ -62,6 +125,7 @@ const JAMS = [
     dur: "1:04",
     status: "triage",
     folder: "Checkout",
+    link: "Support: checkout issues",
   },
   {
     id: "r4",
@@ -72,6 +136,7 @@ const JAMS = [
     dur: "shot",
     status: "progress",
     folder: "Q3 regressions",
+    link: "Beta testers",
   },
   {
     id: "r5",
@@ -82,6 +147,7 @@ const JAMS = [
     dur: "0:18",
     status: "triage",
     folder: "Q3 regressions",
+    link: "Beta testers",
   },
   {
     id: "r6",
@@ -92,6 +158,7 @@ const JAMS = [
     dur: "0:22",
     status: "done",
     folder: "Q3 regressions",
+    link: "Beta testers",
   },
   {
     id: "r7",
@@ -102,6 +169,7 @@ const JAMS = [
     dur: "shot",
     status: "new",
     folder: "Checkout",
+    link: "Support: checkout issues",
   },
   {
     id: "r8",
@@ -112,6 +180,7 @@ const JAMS = [
     dur: "0:37",
     status: "progress",
     folder: "Mobile web",
+    link: "Beta testers",
   },
 ] as const;
 
@@ -173,6 +242,57 @@ export type SeedRows = {
   comments: (typeof comments.$inferInsert)[];
 };
 
+/**
+ * Filler Rewinds so a recording link reaches its design recording count
+ * (LINK_TARGET_COUNTS), each with one error event so it gets a real
+ * errorSignature. Cycling FILLER_ERRORS gives each link a mix of
+ * signatures, not one big group.
+ */
+function buildFillerRows(
+  linkName: keyof typeof LINK_IDS,
+  slug: string,
+  need: number,
+  now: Date,
+): { rewinds: (typeof rewinds.$inferInsert)[]; events: (typeof events.$inferInsert)[] } {
+  const reporters = ["Maya Chen", "Leo Park", "Sara Ali", "Dhiaz Fathra"] as const;
+  const rewindRows: (typeof rewinds.$inferInsert)[] = [];
+  const eventRows: (typeof events.$inferInsert)[] = [];
+
+  for (let i = 0; i < need; i++) {
+    const id = `seed-link-${slug}-f${i + 1}`;
+    const errorText = FILLER_ERRORS[i % FILLER_ERRORS.length];
+    // Older than the JAMS rows (oldest is r8, 4 days) so newest-first lists
+    // put the design's named Rewinds first.
+    const agoMs = (9 + i) * 24 * 60 * 60_000;
+
+    rewindRows.push({
+      id,
+      title: `Filler bug ${i + 1}`,
+      url: "https://app.acme.co/filler",
+      reporterName: reporters[i % reporters.length],
+      status: "new",
+      kind: "video",
+      mediaKey: `rewinds/${id}.webm`,
+      durationSeconds: 15,
+      folderId: null,
+      recordingLinkId: LINK_IDS[linkName],
+      errorSignature: errorSignature([{ text: errorText, isError: true }]),
+      createdAt: new Date(now.getTime() - agoMs),
+      updatedAt: new Date(now.getTime() - agoMs),
+    });
+    eventRows.push({
+      id: `${id}-ev-00`,
+      rewindId: id,
+      t: 0,
+      kind: "err",
+      text: errorText,
+      isError: true,
+    });
+  }
+
+  return { rewinds: rewindRows, events: eventRows };
+}
+
 /** Pure: builds the seed rows for a given "now". No I/O. */
 export function buildSeedRows(now: Date): SeedRows {
   const folderRows = Object.entries(FOLDER_IDS).map(([name, id]) => ({
@@ -187,10 +307,51 @@ export function buildSeedRows(now: Date): SeedRows {
     createdAt: now,
   }));
 
+  const r1Events = EV.map((e, i) => ({
+    id: `seed-r1-ev-${String(i).padStart(2, "0")}`,
+    rewindId: "seed-r1",
+    t: e.t,
+    kind: e.k,
+    text: e.txt,
+    isError: "err" in e && e.err === 1,
+  }));
+
+  // r2 and r3 get r1's first error event, so all three group under one
+  // errorSignature (SPEC-design-parity.md § Decisions #3).
+  const groupedErrorEvent = EV.find((e) => "err" in e && e.err === 1)!;
+  const r2Events = [
+    {
+      id: "seed-r2-ev-00",
+      rewindId: "seed-r2",
+      t: 0,
+      kind: groupedErrorEvent.k,
+      text: groupedErrorEvent.txt,
+      isError: true,
+    },
+  ];
+  const r3Events = [
+    {
+      id: "seed-r3-ev-00",
+      rewindId: "seed-r3",
+      t: 0,
+      kind: groupedErrorEvent.k,
+      text: groupedErrorEvent.txt,
+      isError: true,
+    },
+  ];
+  type SeedEvent = { text: string; isError: boolean };
+  const eventsByRewindId: Record<string, SeedEvent[]> = {
+    "seed-r1": r1Events,
+    "seed-r2": r2Events,
+    "seed-r3": r3Events,
+  };
+
   const rewindRows = JAMS.map((j) => {
     const isScreenshot = j.dur === "shot";
+    const id = `seed-${j.id}`;
+    const ownEvents = eventsByRewindId[id] ?? [];
     return {
-      id: `seed-${j.id}`,
+      id,
       title: j.title,
       url: `https://${j.url}`,
       reporterName: j.by,
@@ -199,23 +360,33 @@ export function buildSeedRows(now: Date): SeedRows {
       // Sample data only: no object exists in storage at this key (seed has
       // no S3 dependency), so the viewer must render a missing-media state
       // for seeded Rewinds.
-      mediaKey: `rewinds/seed-${j.id}.${isScreenshot ? "png" : "webm"}`,
+      mediaKey: `rewinds/${id}.${isScreenshot ? "png" : "webm"}`,
       durationSeconds: isScreenshot ? null : parseDuration(j.dur),
       folderId: FOLDER_IDS[j.folder],
-      recordingLinkId: null,
+      recordingLinkId: LINK_IDS[j.link],
+      errorSignature: errorSignature(ownEvents),
       createdAt: new Date(now.getTime() - j.agoMs),
       updatedAt: new Date(now.getTime() - j.agoMs),
     };
   });
 
-  const eventRows = EV.map((e, i) => ({
-    id: `seed-r1-ev-${String(i).padStart(2, "0")}`,
-    rewindId: "seed-r1",
-    t: e.t,
-    kind: e.k,
-    text: e.txt,
-    isError: "err" in e && e.err === 1,
-  }));
+  function jamsCountForLink(linkName: keyof typeof LINK_IDS): number {
+    return JAMS.filter((j) => j.link === linkName).length;
+  }
+
+  const checkoutFiller = buildFillerRows(
+    "Support: checkout issues",
+    "checkout",
+    LINK_TARGET_COUNTS["Support: checkout issues"] -
+      jamsCountForLink("Support: checkout issues"),
+    now,
+  );
+  const betaFiller = buildFillerRows(
+    "Beta testers",
+    "beta",
+    LINK_TARGET_COUNTS["Beta testers"] - jamsCountForLink("Beta testers"),
+    now,
+  );
 
   const commentRows = COMMENTS.map((c, i) => ({
     id: `seed-r1-comment-${String(i).padStart(2, "0")}`,
@@ -231,8 +402,8 @@ export function buildSeedRows(now: Date): SeedRows {
   return {
     folders: folderRows,
     recordingLinks: linkRows,
-    rewinds: rewindRows,
-    events: eventRows,
+    rewinds: [...rewindRows, ...checkoutFiller.rewinds, ...betaFiller.rewinds],
+    events: [...r1Events, ...r2Events, ...r3Events, ...checkoutFiller.events, ...betaFiller.events],
     comments: commentRows,
   };
 }
@@ -243,7 +414,9 @@ export function buildSeedRows(now: Date): SeedRows {
  * Insert-if-missing (not delete-then-insert, not update-on-conflict) so
  * re-seeding only restores deleted sample rows. It never cascades away
  * user-added comments/events, nulls out user Rewinds' folderId, or reverts
- * user edits to seeded rows.
+ * user edits to seeded rows. The one exception is the default workspace's
+ * name/invite code, which seed() renames once (see SEED_WORKSPACE_NAME
+ * above) — guarded so it never overwrites a later user rename.
  */
 export async function seed(db: Db, now: Date): Promise<void> {
   const rows = buildSeedRows(now);
@@ -271,6 +444,45 @@ export async function seed(db: Db, now: Date): Promise<void> {
       .onConflictDoNothing({
         target: [memberships.workspaceId, memberships.userId],
       }),
+    ...MEMBERS.flatMap((m) => [
+      db
+        .insert(users)
+        .values({
+          id: m.id,
+          email: m.email,
+          passwordHash: hashPassword(MEMBER_PASSWORD),
+          firstName: m.firstName,
+          lastName: m.lastName,
+          createdAt: now,
+        })
+        .onConflictDoNothing({ target: users.id }),
+      db
+        .insert(memberships)
+        .values({
+          workspaceId: DEFAULT_WORKSPACE_ID,
+          userId: m.id,
+          role: m.role,
+          lastActiveAt: now,
+        })
+        .onConflictDoNothing({
+          target: [memberships.workspaceId, memberships.userId],
+        }),
+    ]),
+    ...INTEGRATIONS.map((name) =>
+      db
+        .insert(integrations)
+        .values({ workspaceId: DEFAULT_WORKSPACE_ID, name, connectedAt: now })
+        .onConflictDoNothing({ target: [integrations.workspaceId, integrations.name] }),
+    ),
+    db
+      .update(workspaces)
+      .set({ name: SEED_WORKSPACE_NAME, inviteCode: SEED_WORKSPACE_INVITE_CODE })
+      .where(
+        and(
+          eq(workspaces.id, DEFAULT_WORKSPACE_ID),
+          eq(workspaces.name, MIGRATION_DEFAULT_WORKSPACE_NAME),
+        ),
+      ),
     db
       .insert(folders)
       .values(rows.folders)

@@ -70,7 +70,7 @@ test("logging out from the workspace menu redirects to /login", async ({
   await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page).toHaveURL("/");
 
-  await page.getByRole("button", { name: /Default Workspace/ }).click();
+  await page.getByRole("button", { name: /Dhiaz's Workspace/ }).click();
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login$/);
 });

@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { SEED_EMAIL } from "./auth";
 
-// Seeded Admin (see auth.ts) and their workspace (drizzle/0003_accounts_workspaces.sql
-// inserts the fixed "default-workspace" row named "Default Workspace"; src/db/seed.ts
-// only adds that one Admin membership, no other members).
-const SEED_WORKSPACE_NAME = "Default Workspace";
+// Seeded Admin (see auth.ts) and their workspace: src/db/seed.ts renames the
+// migration's default workspace to "Dhiaz's Workspace" and adds Maya, Leo
+// and Sara as members alongside the seeded Admin.
+const SEED_WORKSPACE_NAME = "Dhiaz's Workspace";
 
 test("navigates between built settings tabs via the left nav", async ({
   page,

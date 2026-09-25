@@ -19,6 +19,19 @@ test("renders seeded recording links with their recording count", async ({
   await expect(row).toBeVisible();
 });
 
+// src/db/seed.ts builds "Support: checkout issues" up to 6 Rewinds and
+// "Beta testers" up to 14 (SPEC-design-parity.md § Seed), each row's own
+// recordingLinkId, real filler Rewinds counted by GET /api/recording-links.
+test("shows each seeded link's design recording count", async ({ page }) => {
+  await page.goto("/links");
+  await dismissOnboarding(page);
+  const checkoutRow = page
+    .locator('[class*="row"]', { hasText: "Support: checkout issues" });
+  const betaRow = page.locator('[class*="row"]', { hasText: SEED_LINK_NAME });
+  await expect(checkoutRow.locator('[class*="count"]')).toHaveText("6");
+  await expect(betaRow.locator('[class*="count"]')).toHaveText("14");
+});
+
 test("creates a new recording link and copies it to the clipboard", async ({
   page,
   context,

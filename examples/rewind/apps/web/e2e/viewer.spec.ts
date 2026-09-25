@@ -66,4 +66,16 @@ test.describe("viewer", () => {
     const res = await page.goto("/r/unknown");
     expect(res?.status()).toBe(404);
   });
+
+  // src/db/seed.ts gives seed-r2 and seed-r3 the same first error event as
+  // seed-r1, so all three group under one errorSignature
+  // (SPEC-design-parity.md § Decisions #3).
+  test("lists the other Rewinds sharing r1's errorSignature", async ({
+    page,
+  }) => {
+    await page.goto("/r/seed-r1");
+    await expect(
+      page.getByText("3 Rewinds share this error"),
+    ).toBeVisible();
+  });
 });

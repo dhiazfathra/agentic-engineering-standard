@@ -11,30 +11,33 @@ import { expect, test } from "@playwright/test";
 test.use({ viewport: { width: 1280, height: 1800 } });
 
 test.describe("library", () => {
+  // Uses seed-r4 ("Avatar upload…"), not seed-r2 or seed-r3: those two now
+  // share seed-r1's errorSignature (SPEC-design-parity.md § Decisions #3),
+  // so Group duplicates (on by default) collapses them into r1's card.
   test("all three views render seeded Rewinds and open the viewer", async ({
     page,
   }) => {
     await page.goto("/");
     await expect(
-      page.getByText("Coupon total shows NaN on mobile"),
+      page.getByText("Avatar upload crops the wrong side"),
     ).toBeVisible();
 
     await page.getByRole("radio", { name: "List" }).click();
     await expect(page).toHaveURL(/view=list/);
     await expect(
-      page.getByText("Coupon total shows NaN on mobile"),
+      page.getByText("Avatar upload crops the wrong side"),
     ).toBeVisible();
 
     await page.getByRole("radio", { name: "Board" }).click();
     await expect(page).toHaveURL(/view=board/);
     await expect(
-      page.getByText("Coupon total shows NaN on mobile"),
+      page.getByText("Avatar upload crops the wrong side"),
     ).toBeVisible();
 
     await page
-      .getByRole("link", { name: "Coupon total shows NaN on mobile" })
+      .getByRole("link", { name: "Avatar upload crops the wrong side" })
       .click();
-    await expect(page).toHaveURL("/r/seed-r2");
+    await expect(page).toHaveURL("/r/seed-r4");
   });
 
   test("folder filter shows only that folder's Rewinds, counts match", async ({
