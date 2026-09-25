@@ -3,7 +3,23 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RewindDetail } from "@/lib/rewinds";
+
+// A mutable stand-in for the flags module: flipped per test instead of
+// vi.resetModules() + vi.doMock() + a dynamic re-import, which re-executes
+// viewer.tsx under a fresh module instance per test and makes v8's coverage
+// merge across those instances nondeterministic.
+const mockFlags = vi.hoisted(() => ({
+  AI_SUMMARY: false,
+  SIMILAR_MERGE: false,
+}));
+vi.mock("@/lib/flags", () => ({ flags: mockFlags }));
+
 import { Viewer } from "./viewer";
+
+afterEach(() => {
+  mockFlags.AI_SUMMARY = false;
+  mockFlags.SIMILAR_MERGE = false;
+});
 
 function videoRewind(): RewindDetail {
   return {
@@ -489,6 +505,23 @@ describe("comments", () => {
     expect(
       container.querySelector('input[aria-label="Comment text"]'),
     ).toBeNull();
+  });
+
+  it("shows the name field when reading the remembered author throws (e.g. storage disabled)", () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage disabled");
+    });
+    mount(
+      <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
+    );
+    const toggle = qAll("button").find((b) => b.textContent === "Comment")!;
+    click(toggle);
+    const frame = q('[class*="mediaFrame"]');
+    click(frame);
+    expect(
+      container.querySelector('input[aria-label="Your name"]'),
+    ).not.toBeNull();
+    getItem.mockRestore();
   });
 
   it("posts a comment and appends it to the list", async () => {
@@ -1019,32 +1052,19 @@ describe("summary tab", () => {
     expect(container.textContent).not.toContain("AI summary");
   });
 
-  it("shows the AI summary block when AI_SUMMARY is on", async () => {
-    vi.resetModules();
-    vi.doMock("@/lib/flags", () => ({
-      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
-    }));
-    const { Viewer: FlaggedViewer } = await import("./viewer");
+  it("shows the AI summary block when AI_SUMMARY is on", () => {
+    mockFlags.AI_SUMMARY = true;
     mount(
-      <FlaggedViewer
-        rewind={videoRewind()}
-        mediaUrl="https://example.com/v.webm"
-      />,
+      <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
     );
     expect(container.textContent).toContain("AI summary");
     expect(container.textContent).toContain("Likely root cause");
-    vi.doUnmock("@/lib/flags");
-    vi.resetModules();
   });
 
-  it("shows the no-error copy and omits root cause when nothing errored", async () => {
-    vi.resetModules();
-    vi.doMock("@/lib/flags", () => ({
-      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
-    }));
-    const { Viewer: FlaggedViewer } = await import("./viewer");
+  it("shows the no-error copy and omits root cause when nothing errored", () => {
+    mockFlags.AI_SUMMARY = true;
     mount(
-      <FlaggedViewer
+      <Viewer
         rewind={{
           ...videoRewind(),
           errorSignature: null,
@@ -1057,18 +1077,12 @@ describe("summary tab", () => {
       "No error was recorded in this Rewind.",
     );
     expect(container.textContent).not.toContain("Likely root cause");
-    vi.doUnmock("@/lib/flags");
-    vi.resetModules();
   });
 
-  it("names the error signature in the AI summary when one is set", async () => {
-    vi.resetModules();
-    vi.doMock("@/lib/flags", () => ({
-      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
-    }));
-    const { Viewer: FlaggedViewer } = await import("./viewer");
+  it("names the error signature in the AI summary when one is set", () => {
+    mockFlags.AI_SUMMARY = true;
     mount(
-      <FlaggedViewer
+      <Viewer
         rewind={{ ...videoRewind(), errorSignature: "sig-1" }}
         mediaUrl="https://example.com/v.webm"
       />,
@@ -1076,25 +1090,14 @@ describe("summary tab", () => {
     expect(container.textContent).toContain(
       'This Rewind\'s errors match signature "sig-1".',
     );
-    vi.doUnmock("@/lib/flags");
-    vi.resetModules();
   });
 
-  it("describes a screenshot Rewind instead of a duration", async () => {
-    vi.resetModules();
-    vi.doMock("@/lib/flags", () => ({
-      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
-    }));
-    const { Viewer: FlaggedViewer } = await import("./viewer");
+  it("describes a screenshot Rewind instead of a duration", () => {
+    mockFlags.AI_SUMMARY = true;
     mount(
-      <FlaggedViewer
-        rewind={screenshotRewind()}
-        mediaUrl="https://example.com/s.png"
-      />,
+      <Viewer rewind={screenshotRewind()} mediaUrl="https://example.com/s.png" />,
     );
     expect(container.textContent).toContain("Recorded as a screenshot.");
-    vi.doUnmock("@/lib/flags");
-    vi.resetModules();
   });
 
   it("hides the similar-error list and merge button with no similar Rewinds", () => {
@@ -1136,14 +1139,10 @@ describe("summary tab", () => {
     ).toBeUndefined();
   });
 
-  it("merging shows a toast and does not call the network", async () => {
-    vi.resetModules();
-    vi.doMock("@/lib/flags", () => ({
-      flags: { AI_SUMMARY: false, SIMILAR_MERGE: true },
-    }));
-    const { Viewer: FlaggedViewer } = await import("./viewer");
+  it("merging shows a toast and does not call the network", () => {
+    mockFlags.SIMILAR_MERGE = true;
     mount(
-      <FlaggedViewer
+      <Viewer
         rewind={{ ...videoRewind(), errorSignature: "sig-1" }}
         mediaUrl="https://example.com/v.webm"
         similarRewinds={similar()}
@@ -1158,7 +1157,5 @@ describe("summary tab", () => {
     expect(container.textContent).toContain(
       "Merged 2 Rewinds into one issue",
     );
-    vi.doUnmock("@/lib/flags");
-    vi.resetModules();
   });
 });

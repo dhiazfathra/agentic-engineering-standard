@@ -34,8 +34,11 @@ vi.mock("next/navigation", () => ({
 // actually wires page.tsx to) memoizes per request. Fake a real,
 // per-argument memoizer here so this file can verify page.tsx's own use of
 // cache() — the memoization itself is React/Next's contract, not this
-// project's code. Each test re-imports page.tsx (below) to get a fresh
-// cache scope, the same as a fresh request would.
+// project's code. The memoizer's store is keyed by argument, so each test
+// uses its own unique id (see `row()` below) rather than resetting modules
+// between tests: re-importing page.tsx per test recompiles its source
+// under a fresh V8 script each time, which makes v8's coverage merging
+// across those duplicate scripts nondeterministic.
 vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react")>();
   return {
@@ -51,26 +54,25 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-const params = Promise.resolve({ id: "seed-r1" });
+import RewindPage, { generateMetadata } from "./page";
 
-const row = {
-  id: "seed-r1",
-  workspaceId: "w1",
-  title: "Checkout fails after applying coupon",
-  url: "https://shop.acme.co/cart",
-  reporterName: "Maya Chen",
-  status: "new",
-  kind: "video",
-  mediaKey: "rewinds/seed-r1.webm",
-  durationSeconds: 42,
-  createdAt: new Date(),
-  events: [],
-  comments: [],
-};
-
-async function loadPage() {
-  vi.resetModules();
-  return import("./page");
+let nextId = 0;
+function row() {
+  const id = `seed-r${++nextId}`;
+  return {
+    id,
+    workspaceId: "w1",
+    title: "Checkout fails after applying coupon",
+    url: "https://shop.acme.co/cart",
+    reporterName: "Maya Chen",
+    status: "new",
+    kind: "video",
+    mediaKey: `rewinds/${id}.webm`,
+    durationSeconds: 42,
+    createdAt: new Date(),
+    events: [],
+    comments: [],
+  };
 }
 
 beforeEach(() => {
@@ -87,38 +89,37 @@ beforeEach(() => {
 });
 
 it("renders the Viewer with the row when found", async () => {
-  const { default: RewindPage } = await loadPage();
-  mocks.getRewind.mockResolvedValue(row);
+  const r = row();
+  mocks.getRewind.mockResolvedValue(r);
   mocks.mediaUrl.mockResolvedValue("https://signed.example/media");
-  const html = renderToStaticMarkup(await RewindPage({ params }));
-  expect(html).toContain(row.title);
+  const html = renderToStaticMarkup(
+    await RewindPage({ params: Promise.resolve({ id: r.id }) }),
+  );
+  expect(html).toContain(r.title);
 });
 
 it("sets the metadata title to the Rewind's title", async () => {
-  const { generateMetadata } = await loadPage();
-  mocks.getRewind.mockResolvedValue(row);
-  await expect(generateMetadata({ params })).resolves.toEqual({
-    title: row.title,
-  });
+  const r = row();
+  mocks.getRewind.mockResolvedValue(r);
+  await expect(
+    generateMetadata({ params: Promise.resolve({ id: r.id }) }),
+  ).resolves.toEqual({ title: r.title });
 });
 
 it("falls back the metadata title when the Rewind is missing", async () => {
-  const { generateMetadata } = await loadPage();
   mocks.getRewind.mockResolvedValue(undefined);
-  await expect(generateMetadata({ params })).resolves.toEqual({
-    title: "Rewind",
-  });
+  await expect(
+    generateMetadata({ params: Promise.resolve({ id: "missing-meta" }) }),
+  ).resolves.toEqual({ title: "Rewind" });
 });
 
 it("404s when missing; redirects to /login when logged out and cross-workspace; 404s when logged in and cross-workspace", async () => {
-  const { default: RewindPage } = await loadPage();
-
   mocks.getRewind.mockResolvedValue(undefined);
   await expect(
     RewindPage({ params: Promise.resolve({ id: "missing" }) }),
   ).rejects.toThrow("NEXT_NOT_FOUND");
 
-  mocks.getRewind.mockResolvedValue(row);
+  mocks.getRewind.mockResolvedValue(row());
   mocks.getPageSession.mockResolvedValue(null);
   await expect(
     RewindPage({ params: Promise.resolve({ id: "logged-out" }) }),
@@ -128,37 +129,41 @@ it("404s when missing; redirects to /login when logged out and cross-workspace; 
   await expect(
     RewindPage({ params: Promise.resolve({ id: "cross-workspace" }) }),
   ).rejects.toThrow("NEXT_NOT_FOUND");
+
+  mocks.findFirstWorkspace.mockResolvedValue(undefined);
+  await expect(
+    RewindPage({ params: Promise.resolve({ id: "deleted-workspace" }) }),
+  ).rejects.toThrow("NEXT_NOT_FOUND");
 });
 
 it("renders for a logged-out viewer when the workspace allows anyone", async () => {
-  const { default: RewindPage } = await loadPage();
-  mocks.getRewind.mockResolvedValue(row);
+  const r = row();
+  mocks.getRewind.mockResolvedValue(r);
   mocks.mediaUrl.mockResolvedValue("https://signed.example/media");
   mocks.getPageSession.mockResolvedValue(null);
   mocks.findFirstWorkspace.mockResolvedValue({ defaultLinkAccess: "anyone" });
-  const html = renderToStaticMarkup(await RewindPage({ params }));
-  expect(html).toContain(row.title);
+  const html = renderToStaticMarkup(
+    await RewindPage({ params: Promise.resolve({ id: r.id }) }),
+  );
+  expect(html).toContain(r.title);
 });
 
 it("fetches similar Rewinds when the row has an errorSignature", async () => {
-  const { default: RewindPage } = await loadPage();
-  mocks.getRewind.mockResolvedValue({ ...row, errorSignature: "sig-1" });
+  const r = row();
+  mocks.getRewind.mockResolvedValue({ ...r, errorSignature: "sig-1" });
   mocks.mediaUrl.mockResolvedValue("https://signed.example/media");
   mocks.listSimilarRewinds.mockResolvedValue([
-    { id: "seed-r2", title: "Other", reporterName: "Leo", createdAt: new Date() },
+    { id: "seed-other", title: "Other", reporterName: "Leo", createdAt: new Date() },
   ]);
-  await RewindPage({ params });
-  expect(mocks.listSimilarRewinds).toHaveBeenCalledWith(
-    "w1",
-    "sig-1",
-    "seed-r1",
-  );
+  await RewindPage({ params: Promise.resolve({ id: r.id }) });
+  expect(mocks.listSimilarRewinds).toHaveBeenCalledWith("w1", "sig-1", r.id);
 });
 
 it("shares one getRewind call between generateMetadata and the page", async () => {
-  const { default: RewindPage, generateMetadata } = await loadPage();
-  mocks.getRewind.mockResolvedValue(row);
+  const r = row();
+  mocks.getRewind.mockResolvedValue(r);
   mocks.mediaUrl.mockResolvedValue("https://signed.example/media");
+  const params = Promise.resolve({ id: r.id });
   await generateMetadata({ params });
   await RewindPage({ params });
   expect(mocks.getRewind).toHaveBeenCalledTimes(1);

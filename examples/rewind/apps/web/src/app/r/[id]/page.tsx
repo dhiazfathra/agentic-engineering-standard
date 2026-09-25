@@ -34,7 +34,7 @@ export default async function RewindPage({ params }: Props) {
     const workspace = await db.query.workspaces.findFirst({
       where: eq(workspaces.id, rewind.workspaceId),
     });
-    if (workspace?.defaultLinkAccess !== "anyone") {
+    if (!workspace || workspace.defaultLinkAccess !== "anyone") {
       if (!session) redirect("/login");
       notFound();
     }

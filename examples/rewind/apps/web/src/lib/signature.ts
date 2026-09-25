@@ -33,7 +33,9 @@ export function errorSignature(events: SignatureEvent[]): string | null {
   if (!errorEvent) return null;
 
   const lines = errorEvent.text.split("\n");
-  const firstLine = lines[0] ?? "";
+  // split() on a string always returns at least one element, so lines[0]
+  // is never undefined.
+  const firstLine = lines[0];
 
   let normalized = firstLine
     .replace(/^Uncaught /, "")
@@ -48,8 +50,10 @@ export function errorSignature(events: SignatureEvent[]): string | null {
   for (const line of lines.slice(1)) {
     const match = STACK_FRAME.exec(line);
     if (match) {
-      const fn = match[1] ?? match[3] ?? "";
-      const file = match[2] ?? match[4] ?? "";
+      // Exactly one alternative of STACK_FRAME matches, so either group 1
+      // or group 3 (and likewise 2 or 4) is always defined here.
+      const fn = (match[1] ?? match[3])!;
+      const file = (match[2] ?? match[4])!;
       normalized += ` @ ${fn.toLowerCase()} ${file.toLowerCase()}`;
       break;
     }

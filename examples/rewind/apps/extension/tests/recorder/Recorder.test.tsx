@@ -4,11 +4,37 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetSettings, updateSettings } from "../../lib/settings";
 
-const tabsGet = vi.fn(async () => ({
-  url: "https://example.com/page" as string | undefined,
+// vi.hoisted, not plain top-level consts: the mock factories below run when
+// Recorder (imported statically further down, so its whole module graph
+// loads eagerly) pulls in these modules, which happens before a plain
+// `const` here would be initialized.
+const {
+  tabsGet,
+  tabsCreate,
+  getURL,
+  send,
+  openTabStream,
+  openDisplayStream,
+  openMic,
+  cropTrack,
+  startRecorder,
+  putDraft,
+} = vi.hoisted(() => ({
+  tabsGet: vi.fn(async () => ({
+    url: "https://example.com/page" as string | undefined,
+  })),
+  tabsCreate: vi.fn(async () => undefined),
+  getURL: vi.fn((path: string) => `chrome-extension://ext${path}`),
+  send: vi.fn(),
+  openTabStream: vi.fn(),
+  openDisplayStream: vi.fn(),
+  openMic: vi.fn(),
+  cropTrack: vi.fn(),
+  startRecorder: vi.fn(),
+  putDraft: vi.fn<(draft: unknown) => Promise<undefined>>(
+    async () => undefined,
+  ),
 }));
-const tabsCreate = vi.fn(async () => undefined);
-const getURL = vi.fn((path: string) => `chrome-extension://ext${path}`);
 
 vi.mock("wxt/browser", () => ({
   browser: {
@@ -17,17 +43,10 @@ vi.mock("wxt/browser", () => ({
   },
 }));
 
-const send = vi.fn();
 vi.mock("../../lib/messages", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/messages")>();
   return { ...actual, send: (...args: unknown[]) => send(...args) };
 });
-
-const openTabStream = vi.fn();
-const openDisplayStream = vi.fn();
-const openMic = vi.fn();
-const cropTrack = vi.fn();
-const startRecorder = vi.fn();
 
 vi.mock("../../lib/media", () => ({
   openTabStream: (...a: unknown[]) => openTabStream(...a),
@@ -37,12 +56,11 @@ vi.mock("../../lib/media", () => ({
   startRecorder: (...a: unknown[]) => startRecorder(...a),
 }));
 
-const putDraft = vi.fn<(draft: unknown) => Promise<undefined>>(
-  async () => undefined,
-);
 vi.mock("../../lib/drafts", () => ({
   putDraft: (a: unknown) => putDraft(a),
 }));
+
+import Recorder from "../../entrypoints/recorder/Recorder";
 
 type Listener = () => void;
 
@@ -89,8 +107,6 @@ let closeSpy: ReturnType<typeof vi.spyOn>;
 
 async function mount(search: string): Promise<void> {
   window.history.pushState({}, "", `/recorder.html${search}`);
-  const Recorder = (await import("../../entrypoints/recorder/Recorder"))
-    .default;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -115,7 +131,6 @@ beforeEach(async () => {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.resetModules();
   vi.clearAllMocks();
   vi.useFakeTimers();
   await resetSettings();

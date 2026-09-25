@@ -2,24 +2,30 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { putDraft, type Draft } from "../../lib/drafts";
-import { resetSettings, updateSettings } from "../../lib/settings";
+import { getDraft, putDraft, type Draft } from "../../lib/drafts";
+import { resetSettings, settings, updateSettings } from "../../lib/settings";
 
-const tabsCreate = vi.fn(async () => undefined);
+// vi.hoisted, not plain top-level consts: the mock factories below run when
+// Editor (imported statically further down, so its whole module graph loads
+// eagerly) pulls in these modules, which happens before a plain `const`
+// here would be initialized.
+const { tabsCreate, encodeFrames, exportImage, remux, fileDraft } = vi.hoisted(
+  () => ({
+    tabsCreate: vi.fn(async () => undefined),
+    encodeFrames: vi.fn(),
+    exportImage: vi.fn(),
+    remux: vi.fn(),
+    fileDraft: vi.fn(),
+  }),
+);
 vi.mock("wxt/browser", () => ({
   browser: { tabs: { create: tabsCreate } },
 }));
-
-const encodeFrames = vi.fn();
-const exportImage = vi.fn();
-const remux = vi.fn();
 vi.mock("../../lib/media", () => ({
   encodeFrames: (...a: unknown[]) => encodeFrames(...a),
   exportImage: (...a: unknown[]) => exportImage(...a),
   remux: (...a: unknown[]) => remux(...a),
 }));
-
-const fileDraft = vi.fn();
 vi.mock("../../lib/upload", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/upload")>();
   return {
@@ -27,6 +33,8 @@ vi.mock("../../lib/upload", async (importOriginal) => {
     fileDraft: (...a: unknown[]) => fileDraft(...a),
   };
 });
+
+import Editor from "../../entrypoints/editor/Editor";
 
 let root: Root;
 let container: HTMLDivElement;
@@ -65,7 +73,6 @@ async function flushMicrotasks(): Promise<void> {
 
 async function mount(id: string): Promise<void> {
   window.history.pushState({}, "", `/editor.html?id=${id}`);
-  const Editor = (await import("../../entrypoints/editor/Editor")).default;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -79,7 +86,6 @@ beforeEach(async () => {
   (
     globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
   ).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.resetModules();
   vi.clearAllMocks();
   await resetSettings();
 
@@ -110,7 +116,6 @@ describe("Editor", () => {
 
   it("treats a missing ?id= the same as an unknown draft", async () => {
     window.history.pushState({}, "", "/editor.html");
-    const Editor = (await import("../../entrypoints/editor/Editor")).default;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -123,11 +128,14 @@ describe("Editor", () => {
 
   it("ignores the load once the page has unmounted", async () => {
     window.history.pushState({}, "", "/editor.html?id=racey");
-    const Editor = (await import("../../entrypoints/editor/Editor")).default;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    await act(async () => {
+    // Sync act only flushes the render and the effect's synchronous setup
+    // (up to its first await), so unmount below always lands before the
+    // mocked getDraft's promise resolves — unlike an async act, which would
+    // let that promise settle first and race unmount against it.
+    act(() => {
       root.render(<Editor />);
     });
     root.unmount();
@@ -154,7 +162,6 @@ describe("Editor", () => {
         ),
     );
     window.history.pushState({}, "", "/editor.html?id=racey-replay");
-    const Editor = (await import("../../entrypoints/editor/Editor")).default;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -337,9 +344,7 @@ describe("Editor", () => {
         close.click();
         await Promise.resolve();
       });
-      expect(
-        await import("../../lib/drafts").then((m) => m.getDraft("shot2")),
-      ).toBeUndefined();
+      expect(await getDraft("shot2")).toBeUndefined();
       expect(closeSpy).toHaveBeenCalled();
     });
 
@@ -385,8 +390,7 @@ describe("Editor", () => {
         url: "https://app.test/r/r1",
       });
       expect(closeSpy).toHaveBeenCalled();
-      const settings = await import("../../lib/settings");
-      expect((await settings.settings.getValue()).reporterName).toBe("Dhiaz");
+      expect((await settings.getValue()).reporterName).toBe("Dhiaz");
     });
 
     it("shows the create error and keeps the draft on failure", async () => {
@@ -407,7 +411,6 @@ describe("Editor", () => {
       await flushMicrotasks();
 
       expect(container.textContent).toContain("POST /api/rewinds failed: 500");
-      const { getDraft } = await import("../../lib/drafts");
       expect(await getDraft("shot4")).toBeDefined();
       expect(cta.disabled).toBe(false);
     });
@@ -459,7 +462,6 @@ describe("Editor", () => {
         close.click();
       });
       expect(closeSpy).toHaveBeenCalled();
-      const { getDraft } = await import("../../lib/drafts");
       expect(await getDraft("vid1")).toBeDefined();
     });
 
