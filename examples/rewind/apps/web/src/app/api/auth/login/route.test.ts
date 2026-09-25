@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   findFirstWorkspace: vi.fn(),
   createSession: vi.fn(),
   setSessionCookie: vi.fn(),
+  setEmailCookie: vi.fn(),
   verifyPassword: vi.fn(),
 }));
 
@@ -26,6 +27,7 @@ vi.mock("@/lib/auth", async () => {
     ...actual,
     createSession: mocks.createSession,
     setSessionCookie: mocks.setSessionCookie,
+    setEmailCookie: mocks.setEmailCookie,
     verifyPassword: mocks.verifyPassword,
   };
 });
@@ -96,6 +98,10 @@ describe("POST /api/auth/login", () => {
     expect(mocks.setSessionCookie).toHaveBeenCalledWith(
       expect.anything(),
       "tok",
+    );
+    expect(mocks.setEmailCookie).toHaveBeenCalledWith(
+      expect.anything(),
+      validBody.email,
     );
   });
 });

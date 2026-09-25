@@ -8,6 +8,7 @@ import {
   generateInviteCode,
   hashPassword,
   publicUser,
+  setEmailCookie,
   setSessionCookie,
 } from "@/lib/auth";
 import { isUniqueViolation, parseBody } from "@/lib/http";
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
       { status: 201 },
     );
     setSessionCookie(res, token);
+    setEmailCookie(res, email);
     return res;
   } catch (error) {
     if (isUniqueViolation(error)) {

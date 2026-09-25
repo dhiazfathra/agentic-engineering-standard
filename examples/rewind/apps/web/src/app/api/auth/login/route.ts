@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import {
   createSession,
   publicUser,
+  setEmailCookie,
   setSessionCookie,
   verifyPassword,
 } from "@/lib/auth";
@@ -40,5 +41,6 @@ export async function POST(req: Request) {
   const token = await createSession(user.id, workspace.id);
   const res = NextResponse.json({ user: publicUser(user), workspace });
   setSessionCookie(res, token);
+  setEmailCookie(res, email);
   return res;
 }

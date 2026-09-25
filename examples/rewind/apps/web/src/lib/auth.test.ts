@@ -26,6 +26,7 @@ vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
 import {
   clearSessionCookie,
   createSession,
+  EMAIL_COOKIE,
   forbidden,
   generateInviteCode,
   generateToken,
@@ -38,6 +39,7 @@ import {
   requireAdmin,
   requireSession,
   SESSION_COOKIE,
+  setEmailCookie,
   setSessionCookie,
   unauthorized,
   verifyPassword,
@@ -128,6 +130,19 @@ describe("createSession / cookies", () => {
       SESSION_COOKIE,
       "",
       expect.objectContaining({ maxAge: 0 }),
+    );
+  });
+
+  it("setEmailCookie sets a non-HttpOnly cookie with the email", async () => {
+    const set = vi.fn();
+    const { NextResponse } = await import("next/server");
+    const res = NextResponse.json({});
+    res.cookies.set = set;
+    setEmailCookie(res, "a@example.com");
+    expect(set).toHaveBeenCalledWith(
+      EMAIL_COOKIE,
+      "a@example.com",
+      expect.objectContaining({ httpOnly: false }),
     );
   });
 });

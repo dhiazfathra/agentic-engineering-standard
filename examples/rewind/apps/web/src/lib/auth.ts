@@ -11,6 +11,8 @@ import { memberships, sessions, users, workspaces } from "@/db/schema";
 import { db } from "@/lib/db";
 
 export const SESSION_COOKIE = "rw_session";
+// Non-HttpOnly: client JS reads it to show "Continue as <email>" on /login.
+export const EMAIL_COOKIE = "rw_last_email";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const INVITE_CODE_ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -75,6 +77,16 @@ export function clearSessionCookie(res: NextResponse): void {
     sameSite: "lax",
     path: "/",
     maxAge: 0,
+  });
+}
+
+/** Remembers the email for the "Continue as <email>" affordance on /login. */
+export function setEmailCookie(res: NextResponse, email: string): void {
+  res.cookies.set(EMAIL_COOKIE, email, {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL_MS / 1000,
   });
 }
 
