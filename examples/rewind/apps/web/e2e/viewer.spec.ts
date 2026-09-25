@@ -12,7 +12,7 @@ test.describe("viewer", () => {
   test("each tab shows its row count", async ({ page }) => {
     await page.goto("/r/seed-r1");
 
-    await page.getByRole("tab", { name: "Events" }).click();
+    await page.getByRole("tab", { name: "Actions" }).click();
     await expect(page.locator('[class*="eventRow"]')).toHaveCount(6);
 
     await page.getByRole("tab", { name: "Console" }).click();
@@ -24,13 +24,13 @@ test.describe("viewer", () => {
     await page.getByRole("tab", { name: /Comments/ }).click();
     await expect(page.locator('[class*="commentRow"]')).toHaveCount(2);
 
-    await page.getByRole("tab", { name: "Info" }).click();
+    await page.getByRole("tab", { name: "Summary" }).click();
     await expect(page.getByTestId("step")).toHaveCount(6);
   });
 
   test("clicking an event moves the time readout", async ({ page }) => {
     await page.goto("/r/seed-r1");
-    await page.getByRole("tab", { name: "Events" }).click();
+    await page.getByRole("tab", { name: "Actions" }).click();
     await page.locator('[class*="eventRow"]').first().click();
     await expect(page.getByText("0:00 / 0:42")).toBeVisible();
     await page.locator('[class*="eventRow"]').nth(1).click();

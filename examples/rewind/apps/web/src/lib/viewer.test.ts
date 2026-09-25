@@ -78,8 +78,8 @@ describe("tabEvents", () => {
     ev({ kind: "err" }),
   ];
 
-  it("events tab: nav/click/input", () => {
-    expect(tabEvents(events, "events").map((e) => e.kind)).toEqual([
+  it("actions tab: nav/click/input", () => {
+    expect(tabEvents(events, "actions").map((e) => e.kind)).toEqual([
       "nav",
       "click",
       "input",
@@ -99,7 +99,7 @@ describe("tabEvents", () => {
   });
 
   it("other tabs: none", () => {
-    expect(tabEvents(events, "info")).toEqual([]);
+    expect(tabEvents(events, "summary")).toEqual([]);
     expect(tabEvents(events, "comments")).toEqual([]);
   });
 });

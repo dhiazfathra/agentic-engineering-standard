@@ -1,4 +1,4 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 import { comments, events, folders, rewinds } from "@/db/schema";
 import { db } from "@/lib/db";
 
@@ -54,6 +54,30 @@ export async function listRewinds(workspaceId: string) {
 }
 
 export type RewindListItem = Awaited<ReturnType<typeof listRewinds>>[number];
+
+/**
+ * Other Rewinds in the same workspace that share `errorSignature`, newest
+ * first. Backs the viewer's "N Rewinds share this error" list.
+ */
+export async function listSimilarRewinds(
+  workspaceId: string,
+  errorSignature: string,
+  excludeId: string,
+) {
+  return db.query.rewinds.findMany({
+    where: and(
+      eq(rewinds.workspaceId, workspaceId),
+      eq(rewinds.errorSignature, errorSignature),
+      ne(rewinds.id, excludeId),
+    ),
+    orderBy: desc(rewinds.createdAt),
+    columns: { id: true, title: true, reporterName: true, createdAt: true },
+  });
+}
+
+export type SimilarRewind = Awaited<
+  ReturnType<typeof listSimilarRewinds>
+>[number];
 
 /** Every folder in a workspace. Shared by the library page and `GET /api/folders`. */
 export async function listFolders(workspaceId: string) {

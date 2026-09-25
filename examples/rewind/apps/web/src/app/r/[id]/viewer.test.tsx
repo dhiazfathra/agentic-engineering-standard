@@ -176,14 +176,14 @@ function click(el: HTMLElement) {
 }
 
 describe("tabs", () => {
-  it("switches between Info, Events, Console, Network and Comments", () => {
+  it("switches between Summary, Actions, Console, Network and Comments", () => {
     mount(
       <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
     );
     const tabs = qAll('[role="tab"]');
     expect(tabs.map((t) => t.textContent)).toEqual([
-      "Info",
-      "Events",
+      "Summary",
+      "Actions",
       "Console",
       "Network",
       "Comments 1",
@@ -216,7 +216,7 @@ describe("seeking", () => {
     expect(container.textContent).toContain("0:02 / 0:42");
   });
 
-  it("seeks from a step in Info", () => {
+  it("seeks from a step in Summary", () => {
     mount(
       <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
     );
@@ -997,5 +997,168 @@ describe("copy link", () => {
       await Promise.resolve();
     });
     expect(container.textContent).toContain("Could not copy link");
+  });
+});
+
+describe("summary tab", () => {
+  function similar(): import("@/lib/rewinds").SimilarRewind[] {
+    return [
+      {
+        id: "seed-r2",
+        title: "Checkout 500 on mobile",
+        reporterName: "Leo Park",
+        createdAt: new Date(Date.now() - 10 * 60_000),
+      },
+    ];
+  }
+
+  it("omits the AI summary block when AI_SUMMARY is off", () => {
+    mount(
+      <Viewer rewind={videoRewind()} mediaUrl="https://example.com/v.webm" />,
+    );
+    expect(container.textContent).not.toContain("AI summary");
+  });
+
+  it("shows the AI summary block when AI_SUMMARY is on", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/flags", () => ({
+      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
+    }));
+    const { Viewer: FlaggedViewer } = await import("./viewer");
+    mount(
+      <FlaggedViewer
+        rewind={videoRewind()}
+        mediaUrl="https://example.com/v.webm"
+      />,
+    );
+    expect(container.textContent).toContain("AI summary");
+    expect(container.textContent).toContain("Likely root cause");
+    vi.doUnmock("@/lib/flags");
+    vi.resetModules();
+  });
+
+  it("shows the no-error copy and omits root cause when nothing errored", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/flags", () => ({
+      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
+    }));
+    const { Viewer: FlaggedViewer } = await import("./viewer");
+    mount(
+      <FlaggedViewer
+        rewind={{
+          ...videoRewind(),
+          errorSignature: null,
+          events: videoRewind().events.map((e) => ({ ...e, isError: false })),
+        }}
+        mediaUrl="https://example.com/v.webm"
+      />,
+    );
+    expect(container.textContent).toContain(
+      "No error was recorded in this Rewind.",
+    );
+    expect(container.textContent).not.toContain("Likely root cause");
+    vi.doUnmock("@/lib/flags");
+    vi.resetModules();
+  });
+
+  it("names the error signature in the AI summary when one is set", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/flags", () => ({
+      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
+    }));
+    const { Viewer: FlaggedViewer } = await import("./viewer");
+    mount(
+      <FlaggedViewer
+        rewind={{ ...videoRewind(), errorSignature: "sig-1" }}
+        mediaUrl="https://example.com/v.webm"
+      />,
+    );
+    expect(container.textContent).toContain(
+      'This Rewind\'s errors match signature "sig-1".',
+    );
+    vi.doUnmock("@/lib/flags");
+    vi.resetModules();
+  });
+
+  it("describes a screenshot Rewind instead of a duration", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/flags", () => ({
+      flags: { AI_SUMMARY: true, SIMILAR_MERGE: false },
+    }));
+    const { Viewer: FlaggedViewer } = await import("./viewer");
+    mount(
+      <FlaggedViewer
+        rewind={screenshotRewind()}
+        mediaUrl="https://example.com/s.png"
+      />,
+    );
+    expect(container.textContent).toContain("Recorded as a screenshot.");
+    vi.doUnmock("@/lib/flags");
+    vi.resetModules();
+  });
+
+  it("hides the similar-error list and merge button with no similar Rewinds", () => {
+    mount(
+      <Viewer
+        rewind={{ ...videoRewind(), errorSignature: "sig-1" }}
+        mediaUrl="https://example.com/v.webm"
+      />,
+    );
+    expect(container.textContent).not.toContain("share this error");
+  });
+
+  it("lists Rewinds sharing the same errorSignature", () => {
+    mount(
+      <Viewer
+        rewind={{ ...videoRewind(), errorSignature: "sig-1" }}
+        mediaUrl="https://example.com/v.webm"
+        similarRewinds={similar()}
+      />,
+    );
+    expect(container.textContent).toContain("2 Rewinds share this error");
+    expect(container.textContent).toContain("Checkout 500 on mobile");
+    const link = qAll("a").find(
+      (a) => a.getAttribute("href") === "/r/seed-r2",
+    );
+    expect(link).toBeTruthy();
+  });
+
+  it("omits the merge button when SIMILAR_MERGE is off", () => {
+    mount(
+      <Viewer
+        rewind={{ ...videoRewind(), errorSignature: "sig-1" }}
+        mediaUrl="https://example.com/v.webm"
+        similarRewinds={similar()}
+      />,
+    );
+    expect(
+      qAll("button").find((b) => b.textContent === "Merge into one issue"),
+    ).toBeUndefined();
+  });
+
+  it("merging shows a toast and does not call the network", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/flags", () => ({
+      flags: { AI_SUMMARY: false, SIMILAR_MERGE: true },
+    }));
+    const { Viewer: FlaggedViewer } = await import("./viewer");
+    mount(
+      <FlaggedViewer
+        rewind={{ ...videoRewind(), errorSignature: "sig-1" }}
+        mediaUrl="https://example.com/v.webm"
+        similarRewinds={similar()}
+      />,
+    );
+    const button = qAll("button").find(
+      (b) => b.textContent === "Merge into one issue",
+    )!;
+    act(() => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain(
+      "Merged 2 Rewinds into one issue",
+    );
+    vi.doUnmock("@/lib/flags");
+    vi.resetModules();
   });
 });

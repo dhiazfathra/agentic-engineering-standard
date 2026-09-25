@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { RewindStatus } from "@rewind/schema";
 import { ToastStack, useToast } from "@/components/toast";
 import { copyRewindLink } from "@/lib/copy-link";
-import type { RewindDetail } from "@/lib/rewinds";
+import { flags } from "@/lib/flags";
+import type { RewindDetail, SimilarRewind } from "@/lib/rewinds";
 import {
   commentsNear,
   currentEventIndex,
@@ -25,13 +26,14 @@ import styles from "./viewer.module.css";
 type Props = {
   rewind: RewindDetail;
   mediaUrl: string;
+  similarRewinds?: SimilarRewind[];
 };
 
 type Draft = { x: number; y: number; t: number };
 
 const TABS: { key: ViewerTab; label: string }[] = [
-  { key: "info", label: "Info" },
-  { key: "events", label: "Events" },
+  { key: "summary", label: "Summary" },
+  { key: "actions", label: "Actions" },
   { key: "console", label: "Console" },
   { key: "network", label: "Network" },
   { key: "comments", label: "Comments" },
@@ -56,8 +58,8 @@ function storeAuthor(name: string): void {
   }
 }
 
-export function Viewer({ rewind, mediaUrl }: Props) {
-  const [tab, setTab] = useState<ViewerTab>("info");
+export function Viewer({ rewind, mediaUrl, similarRewinds = [] }: Props) {
+  const [tab, setTab] = useState<ViewerTab>("summary");
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [mediaError, setMediaError] = useState(false);
@@ -234,6 +236,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
             {rewind.reporterName} ·{" "}
             <time
               dateTime={rewind.createdAt.toISOString()}
+              title={rewind.createdAt.toLocaleString()}
               suppressHydrationWarning
             >
               {timeAgo(rewind.createdAt)}
@@ -241,7 +244,10 @@ export function Viewer({ rewind, mediaUrl }: Props) {
             ·{" "}
             <a href={rewind.url} target="_blank" rel="noreferrer">
               {rewind.url}
-            </a>
+            </a>{" "}
+            · {rewind.kind}
+            {isVideo ? ` · ${formatTime(duration)}` : ""} ·{" "}
+            {STATUS_LABEL[status]}
           </div>
         </div>
         <select
@@ -497,8 +503,29 @@ export function Viewer({ rewind, mediaUrl }: Props) {
             ))}
           </div>
           <div className={styles.tabPanel}>
-            {tab === "info" && (
+            {tab === "summary" && (
               <div className={styles.infoPanel}>
+                {flags.AI_SUMMARY && (
+                  <div className={styles.aiSummary}>
+                    <div className={styles.aiSummaryHead}>AI summary</div>
+                    <div className={styles.aiSummaryBody}>
+                      {rewind.errorSignature
+                        ? `This Rewind's errors match signature "${rewind.errorSignature}".`
+                        : "No error was recorded in this Rewind."}{" "}
+                      {isVideo
+                        ? `Recorded over ${formatTime(duration)}.`
+                        : "Recorded as a screenshot."}
+                    </div>
+                    {events.some((e) => e.isError) && (
+                      <div className={styles.rootCause}>
+                        <div className={styles.rootCauseHeading}>
+                          Likely root cause
+                        </div>
+                        {events.find((e) => e.isError)!.text}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div>
                   <div className={styles.infoHeading}>Steps to reproduce</div>
                   {steps.length === 0 && (
@@ -520,51 +547,47 @@ export function Viewer({ rewind, mediaUrl }: Props) {
                     </button>
                   ))}
                 </div>
-                <div className={styles.detailsList}>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Reporter</span>
-                    <span className={styles.detailValue}>
-                      {rewind.reporterName}
-                    </span>
+                {similarRewinds.length > 0 && (
+                  <div className={styles.similarBox}>
+                    <div className={styles.similarHead}>
+                      {similarRewinds.length + 1} Rewinds share this error
+                    </div>
+                    {similarRewinds.map((r) => (
+                      <Link
+                        key={r.id}
+                        href={`/r/${r.id}`}
+                        className={styles.similarRow}
+                      >
+                        <span
+                          className={styles.similarAvatar}
+                          style={{ background: personColor(r.reporterName) }}
+                        >
+                          {initials(r.reporterName)}
+                        </span>
+                        <span className={styles.similarTitle}>{r.title}</span>
+                        <span className={styles.similarAgo}>
+                          {timeAgo(r.createdAt)}
+                        </span>
+                      </Link>
+                    ))}
+                    {flags.SIMILAR_MERGE && (
+                      <button
+                        type="button"
+                        className={styles.mergeButton}
+                        onClick={() =>
+                          showToast(
+                            `Merged ${similarRewinds.length + 1} Rewinds into one issue`,
+                          )
+                        }
+                      >
+                        Merge into one issue
+                      </button>
+                    )}
                   </div>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Created</span>
-                    <time
-                      className={styles.detailValue}
-                      dateTime={rewind.createdAt.toISOString()}
-                      suppressHydrationWarning
-                    >
-                      {rewind.createdAt.toLocaleString()}
-                    </time>
-                  </div>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Page URL</span>
-                    <span className={styles.detailValue}>
-                      <a href={rewind.url} target="_blank" rel="noreferrer">
-                        {rewind.url}
-                      </a>
-                    </span>
-                  </div>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Type</span>
-                    <span className={styles.detailValue}>{rewind.kind}</span>
-                  </div>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Duration</span>
-                    <span className={styles.detailValue}>
-                      {isVideo ? formatTime(duration) : "—"}
-                    </span>
-                  </div>
-                  <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Status</span>
-                    <span className={styles.detailValue}>
-                      {STATUS_LABEL[status]}
-                    </span>
-                  </div>
-                </div>
+                )}
               </div>
             )}
-            {(tab === "events" || tab === "console" || tab === "network") && (
+            {(tab === "actions" || tab === "console" || tab === "network") && (
               <div className={styles.eventList}>
                 {tabRows.map((e) => {
                   const eventIndex = events.findIndex((ev) => ev.id === e.id);

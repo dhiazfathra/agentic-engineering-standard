@@ -17,7 +17,12 @@ export type ViewerComment = {
   text: string;
 };
 
-export type ViewerTab = "info" | "events" | "console" | "network" | "comments";
+export type ViewerTab =
+  | "summary"
+  | "actions"
+  | "console"
+  | "network"
+  | "comments";
 
 /** `m:ss`, floors fractional seconds. */
 export function formatTime(seconds: number): string {
@@ -40,7 +45,7 @@ export function timeAgo(from: Date, now: Date = new Date()): string {
 }
 
 const TAB_KINDS: Partial<Record<ViewerTab, EventKind[]>> = {
-  events: ["nav", "click", "input"],
+  actions: ["nav", "click", "input"],
   console: ["log", "warn", "err"],
   network: ["net"],
 };
@@ -59,7 +64,7 @@ export type Step = { n: number; text: string; t: number };
 
 /** One numbered step per user event (nav/click/input), in time order. */
 export function stepsToReproduce(events: ViewerEvent[]): Step[] {
-  return tabEvents(events, "events").map((e, i) => ({
+  return tabEvents(events, "actions").map((e, i) => ({
     n: i + 1,
     text: e.text,
     t: e.t,

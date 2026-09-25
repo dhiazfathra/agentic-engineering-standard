@@ -5,7 +5,10 @@ import { notFound, redirect } from "next/navigation";
 import { workspaces } from "@/db/schema";
 import { db } from "@/lib/db";
 import { getPageSession } from "@/lib/auth";
-import { getRewind as getRewindUncached } from "@/lib/rewinds";
+import {
+  getRewind as getRewindUncached,
+  listSimilarRewinds,
+} from "@/lib/rewinds";
 import { mediaUrl } from "@/lib/storage";
 import { Viewer } from "./viewer";
 
@@ -37,5 +40,15 @@ export default async function RewindPage({ params }: Props) {
     }
   }
 
-  return <Viewer rewind={rewind} mediaUrl={await mediaUrl(rewind.mediaKey)} />;
+  const similarRewinds = rewind.errorSignature
+    ? await listSimilarRewinds(rewind.workspaceId, rewind.errorSignature, rewind.id)
+    : [];
+
+  return (
+    <Viewer
+      rewind={rewind}
+      mediaUrl={await mediaUrl(rewind.mediaKey)}
+      similarRewinds={similarRewinds}
+    />
+  );
 }

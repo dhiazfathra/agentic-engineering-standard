@@ -3,6 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getRewind: vi.fn(),
+  listSimilarRewinds: vi.fn(),
   mediaUrl: vi.fn(),
   getPageSession: vi.fn(),
   findFirstWorkspace: vi.fn(),
@@ -14,7 +15,10 @@ const mocks = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("@/lib/rewinds", () => ({ getRewind: mocks.getRewind }));
+vi.mock("@/lib/rewinds", () => ({
+  getRewind: mocks.getRewind,
+  listSimilarRewinds: mocks.listSimilarRewinds,
+}));
 vi.mock("@/lib/storage", () => ({ mediaUrl: mocks.mediaUrl }));
 vi.mock("@/lib/auth", () => ({ getPageSession: mocks.getPageSession }));
 vi.mock("@/lib/db", () => ({
@@ -71,6 +75,8 @@ async function loadPage() {
 
 beforeEach(() => {
   mocks.getRewind.mockReset();
+  mocks.listSimilarRewinds.mockReset();
+  mocks.listSimilarRewinds.mockResolvedValue([]);
   mocks.mediaUrl.mockReset();
   mocks.getPageSession.mockReset();
   mocks.findFirstWorkspace.mockReset();
@@ -132,6 +138,21 @@ it("renders for a logged-out viewer when the workspace allows anyone", async () 
   mocks.findFirstWorkspace.mockResolvedValue({ defaultLinkAccess: "anyone" });
   const html = renderToStaticMarkup(await RewindPage({ params }));
   expect(html).toContain(row.title);
+});
+
+it("fetches similar Rewinds when the row has an errorSignature", async () => {
+  const { default: RewindPage } = await loadPage();
+  mocks.getRewind.mockResolvedValue({ ...row, errorSignature: "sig-1" });
+  mocks.mediaUrl.mockResolvedValue("https://signed.example/media");
+  mocks.listSimilarRewinds.mockResolvedValue([
+    { id: "seed-r2", title: "Other", reporterName: "Leo", createdAt: new Date() },
+  ]);
+  await RewindPage({ params });
+  expect(mocks.listSimilarRewinds).toHaveBeenCalledWith(
+    "w1",
+    "sig-1",
+    "seed-r1",
+  );
 });
 
 it("shares one getRewind call between generateMetadata and the page", async () => {

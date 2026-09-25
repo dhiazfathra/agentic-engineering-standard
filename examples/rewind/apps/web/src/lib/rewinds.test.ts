@@ -2,13 +2,14 @@ import { expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
+  findManyRewinds: vi.fn(),
   findManyFolders: vi.fn(),
   orderBy: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({
   db: {
     query: {
-      rewinds: { findFirst: mocks.findFirst },
+      rewinds: { findFirst: mocks.findFirst, findMany: mocks.findManyRewinds },
       folders: { findMany: mocks.findManyFolders },
     },
     select: () => ({
@@ -17,7 +18,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-const { getRewind, listRewinds, listFolders } = await import("./rewinds");
+const { getRewind, listRewinds, listFolders, listSimilarRewinds } =
+  await import("./rewinds");
 
 it("finds a rewind with its events and comments ordered by t", async () => {
   const row = { id: "r1", events: [], comments: [] };
@@ -51,4 +53,17 @@ it("lists every folder in the workspace", async () => {
   const rows = [{ id: "f1", name: "Bugs" }];
   mocks.findManyFolders.mockResolvedValue(rows);
   await expect(listFolders("w1")).resolves.toBe(rows);
+});
+
+it("lists other rewinds sharing the same errorSignature, newest first", async () => {
+  const rows = [{ id: "r2", title: "Other", reporterName: "Leo", createdAt: new Date() }];
+  mocks.findManyRewinds.mockResolvedValue(rows);
+  await expect(
+    listSimilarRewinds("w1", "sig-1", "r1"),
+  ).resolves.toBe(rows);
+  expect(mocks.findManyRewinds).toHaveBeenCalledWith(
+    expect.objectContaining({
+      columns: { id: true, title: true, reporterName: true, createdAt: true },
+    }),
+  );
 });
