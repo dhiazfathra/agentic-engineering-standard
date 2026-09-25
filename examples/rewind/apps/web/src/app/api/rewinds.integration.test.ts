@@ -69,6 +69,7 @@ describe("rewinds API against a real database", () => {
         events: [
           { t: 2, kind: "click", text: "clicked", isError: false },
           { t: 1, kind: "nav", text: "navigated", isError: false },
+          { t: 3, kind: "err", text: "TypeError", isError: true },
         ],
       }),
     );
@@ -90,11 +91,14 @@ describe("rewinds API against a real database", () => {
     expect(dupRes.status).toBe(409);
     expect(await dupRes.json()).toEqual({ error: "mediaKey already used" });
 
-    // List
+    // List, with errorCount as a correlated count of isError events
     const listRes = await rewindsRoute.GET();
     expect(listRes.status).toBe(200);
     const list = await listRes.json();
     expect(list.map((r: { id: string }) => r.id)).toContain(rewind.id);
+    expect(
+      list.find((r: { id: string }) => r.id === rewind.id).errorCount,
+    ).toBe(1);
 
     // Get with events sorted by t
     const params = Promise.resolve({ id: rewind.id as string });
@@ -103,7 +107,7 @@ describe("rewinds API against a real database", () => {
     });
     expect(getRes.status).toBe(200);
     const withEvents = await getRes.json();
-    expect(withEvents.events.map((e: { t: number }) => e.t)).toEqual([1, 2]);
+    expect(withEvents.events.map((e: { t: number }) => e.t)).toEqual([1, 2, 3]);
     expect(withEvents.comments).toEqual([]);
 
     // Add a comment

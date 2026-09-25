@@ -1,4 +1,3 @@
-import { desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createRewind, newId } from "@rewind/schema";
 import { events, rewinds } from "@/db/schema";
@@ -8,6 +7,7 @@ import {
   isUniqueViolation,
   parseBody,
 } from "@/lib/http";
+import { listRewinds } from "@/lib/rewinds";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +17,7 @@ export const dynamic = "force-dynamic";
 const EVENTS_PER_INSERT = 1_000;
 
 export async function GET() {
-  const rows = await db.query.rewinds.findMany({
-    orderBy: desc(rewinds.createdAt),
-  });
+  const rows = await listRewinds();
   return NextResponse.json(rows);
 }
 

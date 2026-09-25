@@ -7,10 +7,10 @@ function chain(resolved: unknown) {
   return obj;
 }
 
-const mocks = vi.hoisted(() => ({ findMany: vi.fn(), insert: vi.fn() }));
+const mocks = vi.hoisted(() => ({ listFolders: vi.fn(), insert: vi.fn() }));
+vi.mock("@/lib/rewinds", () => ({ listFolders: mocks.listFolders }));
 vi.mock("@/lib/db", () => ({
   db: {
-    query: { folders: { findMany: mocks.findMany } },
     insert: mocks.insert,
   },
 }));
@@ -28,7 +28,7 @@ describe("GET /api/folders", () => {
   beforeEach(() => vi.resetAllMocks());
 
   it("lists folders", async () => {
-    mocks.findMany.mockResolvedValue([row]);
+    mocks.listFolders.mockResolvedValue([row]);
     const res = await GET();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([

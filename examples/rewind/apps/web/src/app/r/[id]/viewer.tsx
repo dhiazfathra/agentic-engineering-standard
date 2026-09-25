@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RewindStatus } from "@rewind/schema";
+import { ToastStack, useToast } from "@/components/toast";
+import { copyRewindLink } from "@/lib/copy-link";
 import type { RewindDetail } from "@/lib/rewinds";
 import {
   commentsNear,
@@ -24,8 +26,6 @@ type Props = {
   rewind: RewindDetail;
   mediaUrl: string;
 };
-
-type Toast = { text: string; tone: "ok" | "error" };
 
 type Draft = { x: number; y: number; t: number };
 
@@ -70,12 +70,11 @@ export function Viewer({ rewind, mediaUrl }: Props) {
   const [draftText, setDraftText] = useState("");
   const [rememberedAuthor, setRememberedAuthor] = useState(readStoredAuthor);
   const [authorName, setAuthorName] = useState(rememberedAuthor);
-  const [toast, setToast] = useState<Toast | null>(null);
+  const { toasts, showToast, undo, close } = useToast();
   const [posting, setPosting] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const mediaRef = useRef<HTMLVideoElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const duration = rewind.durationSeconds ?? 0;
   const isVideo = rewind.kind === "video";
@@ -92,12 +91,6 @@ export function Viewer({ rewind, mediaUrl }: Props) {
     if (isVideo) mediaRef.current!.src = mediaUrl;
     else imgRef.current!.src = mediaUrl;
   }, [isVideo, mediaUrl]);
-
-  const showToast = (next: Toast) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast(next);
-    toastTimer.current = setTimeout(() => setToast(null), 3000);
-  };
 
   const seek = (next: number) => {
     const clamped = Math.max(0, Math.min(duration, next));
@@ -166,7 +159,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
     if (posting || !draftText.trim()) return;
     const author = authorName.trim();
     if (!author) {
-      showToast({ text: "Enter your name to comment", tone: "error" });
+      showToast("Enter your name to comment", "error");
       return;
     }
     const body = {
@@ -192,9 +185,9 @@ export function Viewer({ rewind, mediaUrl }: Props) {
       setDraftText("");
       setCommentMode(false);
       setTab("comments");
-      showToast({ text: "Comment added", tone: "ok" });
+      showToast("Comment added");
     } catch {
-      showToast({ text: "Could not post comment", tone: "error" });
+      showToast("Could not post comment", "error");
     } finally {
       setPosting(false);
     }
@@ -214,19 +207,18 @@ export function Viewer({ rewind, mediaUrl }: Props) {
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch {
       setStatus(previous);
-      showToast({ text: "Could not update status", tone: "error" });
+      showToast("Could not update status", "error");
     } finally {
       setUpdatingStatus(false);
     }
   };
 
   const copyLink = async () => {
-    const link = `${location.origin}/r/${rewind.id}`;
     try {
-      await navigator.clipboard.writeText(link);
-      showToast({ text: "Link copied", tone: "ok" });
+      await copyRewindLink(rewind.id);
+      showToast("Link copied");
     } catch {
-      showToast({ text: "Could not copy link", tone: "error" });
+      showToast("Could not copy link", "error");
     }
   };
 
@@ -647,14 +639,7 @@ export function Viewer({ rewind, mediaUrl }: Props) {
         </div>
       </div>
 
-      {toast && (
-        <div
-          className={`${styles.toast} ${toast.tone === "error" ? styles.error : ""}`}
-          role="status"
-        >
-          {toast.text}
-        </div>
-      )}
+      <ToastStack toasts={toasts} onUndo={undo} onClose={close} />
     </div>
   );
 }

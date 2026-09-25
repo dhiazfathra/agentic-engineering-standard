@@ -3,11 +3,12 @@ import { createFolder } from "@rewind/schema";
 import { folders } from "@/db/schema";
 import { db } from "@/lib/db";
 import { parseBody } from "@/lib/http";
+import { listFolders } from "@/lib/rewinds";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const rows = await db.query.folders.findMany();
+  const rows = await listFolders();
   return NextResponse.json(rows);
 }
 

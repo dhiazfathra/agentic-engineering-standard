@@ -10,14 +10,15 @@ function chain(resolved: unknown) {
 }
 
 const mocks = vi.hoisted(() => ({
-  findMany: vi.fn(),
+  listRewinds: vi.fn(),
   insert: vi.fn(),
   batch: vi.fn(),
 }));
 
+vi.mock("@/lib/rewinds", () => ({ listRewinds: mocks.listRewinds }));
+
 vi.mock("@/lib/db", () => ({
   db: {
-    query: { rewinds: { findMany: mocks.findMany } },
     insert: mocks.insert,
     batch: mocks.batch,
   },
@@ -49,13 +50,14 @@ const request = (body: unknown) =>
 describe("GET /api/rewinds", () => {
   beforeEach(() => vi.resetAllMocks());
 
-  it("lists rewinds newest first", async () => {
-    mocks.findMany.mockResolvedValue([row]);
+  it("lists rewinds newest first with errorCount", async () => {
+    mocks.listRewinds.mockResolvedValue([{ ...row, errorCount: 2 }]);
     const res = await GET();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([
       {
         ...row,
+        errorCount: 2,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
       },
