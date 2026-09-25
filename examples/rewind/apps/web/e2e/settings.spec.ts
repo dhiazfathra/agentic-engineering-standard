@@ -28,6 +28,11 @@ test("404s a tab gated by a flag that is off, and a chunk-7 tab", async ({
   expect(integrations?.status()).toBe(404);
 });
 
+test("404s the flag-gated /helpdesk page", async ({ page }) => {
+  const res = await page.goto("/helpdesk");
+  expect(res?.status()).toBe(404);
+});
+
 test("hides flagged nav items and never links to a chunk-7 tab", async ({
   page,
 }) => {

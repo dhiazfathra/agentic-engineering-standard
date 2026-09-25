@@ -55,6 +55,13 @@ test.describe("viewer", () => {
     await expect(page.getByRole("slider")).toHaveCount(0);
   });
 
+  test("omits Send to Linear when INTEGRATIONS is off", async ({ page }) => {
+    await page.goto("/r/seed-r1");
+    await expect(
+      page.getByRole("button", { name: "Send to Linear" }),
+    ).toHaveCount(0);
+  });
+
   test("an unknown id is a 404", async ({ page }) => {
     const res = await page.goto("/r/unknown");
     expect(res?.status()).toBe(404);

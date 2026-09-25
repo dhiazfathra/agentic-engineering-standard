@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { publicUser } from "@/lib/auth";
 import {
   defaultLinkAccess,
@@ -478,7 +478,7 @@ export function SettingsPage({
               />
             )}
             {tab === "mcp" && (
-              <McpTab onNotice={() => showToast("Manage tokens above")} />
+              <McpTab onNotice={(message) => showToast(message)} />
             )}
             {tab === "cli" && <CliTab onCopy={() => showToast("Copied")} />}
             {tab === "webhooks" && (
@@ -1109,7 +1109,40 @@ function SdkTab({
   );
 }
 
-function McpTab({ onNotice }: { onNotice: () => void }) {
+type AccessToken = { id: string; name: string; createdAt: string };
+
+function McpTab({ onNotice }: { onNotice: (message: string) => void }) {
+  const [tokens, setTokens] = useState<AccessToken[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/tokens")
+      .then((res) => (res.ok ? (res.json() as Promise<AccessToken[]>) : []))
+      .then(setTokens)
+      .catch(() => {});
+  }, []);
+
+  async function createToken() {
+    const name = window.prompt("Name this token (e.g. your MCP client)");
+    if (!name) return;
+    setCreating(true);
+    try {
+      const res = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error("failed");
+      const row = (await res.json()) as AccessToken & { token: string };
+      setTokens((t) => [...t, row]);
+      onNotice(`Token created: ${row.token} (copy it now, it won't be shown again)`);
+    } catch {
+      onNotice("Couldn't create that token");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <>
       <div>
@@ -1118,7 +1151,17 @@ function McpTab({ onNotice }: { onNotice: () => void }) {
           Used by MCP clients to authenticate as you
         </div>
       </div>
-      <button type="button" className={styles.secondaryButton} onClick={onNotice}>
+      {tokens.map((t) => (
+        <div className={styles.tableRow} key={t.id}>
+          <span>{t.name}</span>
+        </div>
+      ))}
+      <button
+        type="button"
+        className={styles.secondaryButton}
+        disabled={creating}
+        onClick={createToken}
+      >
         + Create token
       </button>
       <div className={styles.divider} />

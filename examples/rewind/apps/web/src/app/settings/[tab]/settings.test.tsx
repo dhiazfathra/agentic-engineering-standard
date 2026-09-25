@@ -973,15 +973,83 @@ describe("sdk tab", () => {
 });
 
 describe("mcp tab", () => {
-  it("shows tokens notice and AI agent catalog", async () => {
-    vi.stubGlobal("fetch", jsonFetchFor({}));
+  it("shows the AI agent catalog and loads existing tokens", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchFor({
+        "GET /api/tokens": {
+          body: [{ id: "t1", name: "My laptop", createdAt: "2024-01-01" }],
+        },
+      }),
+    );
     mount(<SettingsPage {...baseProps({ tab: "mcp" })} />);
     await flush();
     expect(container.textContent).toContain("Personal access tokens");
+    expect(container.textContent).toContain("My laptop");
+    expect(container.textContent).toContain("Claude");
+  });
+
+  it("shows no tokens when the load request throws", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
+    mount(<SettingsPage {...baseProps({ tab: "mcp" })} />);
+    await flush();
+    expect(container.textContent).not.toContain("My laptop");
+  });
+
+  it("shows no tokens when the load request fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchFor({ "GET /api/tokens": { status: 500 } }),
+    );
+    mount(<SettingsPage {...baseProps({ tab: "mcp" })} />);
+    await flush();
+    expect(container.textContent).not.toContain("My laptop");
+  });
+
+  it("does nothing when the create-token prompt is cancelled", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({ "GET /api/tokens": { body: [] } }));
+    vi.stubGlobal("prompt", vi.fn().mockReturnValue(null));
+    mount(<SettingsPage {...baseProps({ tab: "mcp" })} />);
+    await flush();
     click(byText("button", "+ Create token"));
     await flush();
-    expect(container.textContent).toContain("Manage tokens above");
-    expect(container.textContent).toContain("Claude");
+    expect(container.textContent).not.toContain("Token created");
+  });
+
+  it("creates a token and shows it once in a toast", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchFor({
+        "GET /api/tokens": { body: [] },
+        "POST /api/tokens": {
+          status: 201,
+          body: { id: "t2", name: "CI", createdAt: "2024-01-01", token: "rw_abc123" },
+        },
+      }),
+    );
+    vi.stubGlobal("prompt", vi.fn().mockReturnValue("CI"));
+    mount(<SettingsPage {...baseProps({ tab: "mcp" })} />);
+    await flush();
+    click(byText("button", "+ Create token"));
+    await flush();
+    expect(container.textContent).toContain("Token created: rw_abc123");
+    expect(container.textContent).toContain("CI");
+  });
+
+  it("toasts an error when token creation fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchFor({
+        "GET /api/tokens": { body: [] },
+        "POST /api/tokens": { status: 500 },
+      }),
+    );
+    vi.stubGlobal("prompt", vi.fn().mockReturnValue("CI"));
+    mount(<SettingsPage {...baseProps({ tab: "mcp" })} />);
+    await flush();
+    click(byText("button", "+ Create token"));
+    await flush();
+    expect(container.textContent).toContain("Couldn't create that token");
   });
 });
 
