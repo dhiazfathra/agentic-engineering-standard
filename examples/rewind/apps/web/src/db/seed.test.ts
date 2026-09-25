@@ -6,9 +6,25 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { verifyPassword } from "@/lib/password";
 import * as schema from "./schema";
-import { comments, events, folders, recordingLinks, rewinds } from "./schema";
-import { buildSeedRows, seed } from "./seed";
+import {
+  comments,
+  DEFAULT_WORKSPACE_ID,
+  events,
+  folders,
+  memberships,
+  recordingLinks,
+  rewinds,
+  users,
+} from "./schema";
+import {
+  buildSeedRows,
+  seed,
+  SEED_USER_EMAIL,
+  SEED_USER_ID,
+  SEED_USER_PASSWORD,
+} from "./seed";
 
 describe("buildSeedRows", () => {
   const now = new Date("2026-09-23T12:00:00.000Z");
@@ -93,6 +109,25 @@ describe("seed", () => {
     expect(await db.select().from(rewinds)).toHaveLength(8);
     expect(await db.select().from(events)).toHaveLength(13);
     expect(await db.select().from(comments)).toHaveLength(2);
+  });
+
+  it("seeds the admin login as an Admin of the default workspace", async () => {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, SEED_USER_ID),
+    });
+    expect(user?.email).toBe(SEED_USER_EMAIL);
+    expect(verifyPassword(SEED_USER_PASSWORD, user!.passwordHash)).toBe(true);
+
+    const membership = await db.query.memberships.findFirst({
+      where: and(
+        eq(memberships.workspaceId, DEFAULT_WORKSPACE_ID),
+        eq(memberships.userId, SEED_USER_ID),
+      ),
+    });
+    expect(membership?.role).toBe("Admin");
+
+    await seed(db, new Date());
+    expect(await db.select().from(users)).toHaveLength(1);
   });
 
   it("loads the r1 rewind with its events and comments through relations", async () => {

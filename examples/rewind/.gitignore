@@ -36,4 +36,6 @@ test-results/
 playwright-report/
 e2e.db
 ext-e2e.db
+# Saved session cookie from the Playwright auth setup project.
+apps/web/e2e/.auth/
 !.env.example

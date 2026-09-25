@@ -23,6 +23,10 @@ const output = join(process.cwd(), ".output");
 export const FIXTURE_URL = "http://localhost:3300/";
 const FIXTURE_TITLE = "Rewind fixture";
 
+// Matches apps/web/src/db/seed.ts's seeded Admin login (ADR-0003 session auth).
+const SEED_EMAIL = "dhiazfathra@gmail.com";
+const SEED_PASSWORD = "rewind-dev";
+
 const FIXTURE_HTML = `<!doctype html>
 <html><head><title>${FIXTURE_TITLE}</title></head>
 <body>
@@ -50,6 +54,18 @@ export async function launchExtension(): Promise<{
       `--auto-select-tab-capture-source-by-title=${FIXTURE_TITLE}`,
     ],
   });
+  // The web app's routes now require a session (ADR-0003). The extension's
+  // uploads/rewinds fetches send `credentials: "include"`, so logging in
+  // once here, on this context's cookie jar, is enough for every request
+  // this context later makes to WEB_URL.
+  const loginRes = await context.request.post(`${WEB_URL}/api/auth/login`, {
+    data: { email: SEED_EMAIL, password: SEED_PASSWORD },
+  });
+  if (!loginRes.ok()) {
+    throw new Error(
+      `extension e2e: seed login failed: ${loginRes.status()} ${await loginRes.text()}`,
+    );
+  }
   const worker =
     context.serviceWorkers()[0] ??
     (await context.waitForEvent("serviceworker"));

@@ -1,14 +1,12 @@
 import "server-only";
-import {
-  createHash,
-  randomBytes,
-  scryptSync,
-  timingSafeEqual,
-} from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { memberships, sessions, users, workspaces } from "@/db/schema";
 import { db } from "@/lib/db";
+import { hashPassword, verifyPassword } from "@/lib/password";
+
+export { hashPassword, verifyPassword };
 
 export const SESSION_COOKIE = "rw_session";
 // Non-HttpOnly: client JS reads it to show "Continue as <email>" on /login.
@@ -16,22 +14,6 @@ export const EMAIL_COOKIE = "rw_last_email";
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const INVITE_CODE_ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-/** scrypt with a random salt, stored as `<salt hex>:<hash hex>`. */
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, 64);
-  return `${salt.toString("hex")}:${hash.toString("hex")}`;
-}
-
-export function verifyPassword(password: string, stored: string): boolean {
-  const [saltHex, hashHex] = stored.split(":");
-  if (!saltHex || !hashHex) return false;
-  const salt = Buffer.from(saltHex, "hex");
-  const expected = Buffer.from(hashHex, "hex");
-  const actual = scryptSync(password, salt, expected.length);
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
 
 /** SHA-256 hex digest — used to store session and access-token secrets. */
 export function hashToken(token: string): string {

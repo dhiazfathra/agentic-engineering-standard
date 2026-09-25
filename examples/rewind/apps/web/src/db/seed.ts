@@ -1,8 +1,24 @@
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
-import { comments, events, folders, recordingLinks, rewinds } from "./schema";
+import { hashPassword } from "@/lib/password";
+import {
+  comments,
+  DEFAULT_WORKSPACE_ID,
+  events,
+  folders,
+  memberships,
+  recordingLinks,
+  rewinds,
+  users,
+} from "./schema";
 import type * as schema from "./schema";
 
 type Db = LibSQLDatabase<typeof schema>;
+
+// Seeded login for local dev and e2e: dhiazfathra@gmail.com / rewind-dev,
+// Admin of the default workspace (which seeded Rewinds already belong to).
+export const SEED_USER_ID = "seed-user-admin";
+export const SEED_USER_EMAIL = "dhiazfathra@gmail.com";
+export const SEED_USER_PASSWORD = "rewind-dev";
 
 const FOLDER_IDS = {
   Checkout: "seed-folder-checkout",
@@ -233,6 +249,28 @@ export async function seed(db: Db, now: Date): Promise<void> {
   const rows = buildSeedRows(now);
 
   await db.batch([
+    db
+      .insert(users)
+      .values({
+        id: SEED_USER_ID,
+        email: SEED_USER_EMAIL,
+        passwordHash: hashPassword(SEED_USER_PASSWORD),
+        firstName: "Dhiaz",
+        lastName: "Fathra",
+        createdAt: now,
+      })
+      .onConflictDoNothing({ target: users.id }),
+    db
+      .insert(memberships)
+      .values({
+        workspaceId: DEFAULT_WORKSPACE_ID,
+        userId: SEED_USER_ID,
+        role: "Admin",
+        lastActiveAt: now,
+      })
+      .onConflictDoNothing({
+        target: [memberships.workspaceId, memberships.userId],
+      }),
     db
       .insert(folders)
       .values(rows.folders)
