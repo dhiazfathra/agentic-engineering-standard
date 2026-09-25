@@ -11,6 +11,7 @@ import type { RewindDetail } from "@/lib/rewinds";
 const mockFlags = vi.hoisted(() => ({
   AI_SUMMARY: false,
   SIMILAR_MERGE: false,
+  INTEGRATIONS: false,
 }));
 vi.mock("@/lib/flags", () => ({ flags: mockFlags }));
 
@@ -19,6 +20,7 @@ import { Viewer } from "./viewer";
 afterEach(() => {
   mockFlags.AI_SUMMARY = false;
   mockFlags.SIMILAR_MERGE = false;
+  mockFlags.INTEGRATIONS = false;
 });
 
 function videoRewind(): RewindDetail {
@@ -1124,6 +1126,37 @@ describe("summary tab", () => {
       (a) => a.getAttribute("href") === "/r/seed-r2",
     );
     expect(link).toBeTruthy();
+  });
+
+  it("omits Send to Linear when INTEGRATIONS is off", () => {
+    mount(
+      <Viewer
+        rewind={videoRewind()}
+        mediaUrl="https://example.com/v.webm"
+        similarRewinds={[]}
+      />,
+    );
+    expect(
+      qAll("button").find((b) => b.textContent === "Send to Linear"),
+    ).toBeUndefined();
+  });
+
+  it("sending to Linear shows a toast", () => {
+    mockFlags.INTEGRATIONS = true;
+    mount(
+      <Viewer
+        rewind={videoRewind()}
+        mediaUrl="https://example.com/v.webm"
+        similarRewinds={[]}
+      />,
+    );
+    const button = qAll("button").find(
+      (b) => b.textContent === "Send to Linear",
+    )!;
+    act(() => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Sent to Linear");
   });
 
   it("omits the merge button when SIMILAR_MERGE is off", () => {

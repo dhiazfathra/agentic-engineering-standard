@@ -263,6 +263,15 @@ export function Viewer({ rewind, mediaUrl, similarRewinds = [] }: Props) {
             </option>
           ))}
         </select>
+        {flags.INTEGRATIONS && (
+          <button
+            type="button"
+            className={styles.copyLink}
+            onClick={() => showToast("Sent to Linear")}
+          >
+            Send to Linear
+          </button>
+        )}
         <button type="button" className={styles.copyLink} onClick={copyLink}>
           Copy link
         </button>
