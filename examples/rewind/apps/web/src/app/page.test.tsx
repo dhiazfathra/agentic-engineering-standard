@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   listRewinds: vi.fn(),
   listFolders: vi.fn(),
+  getPageSession: vi.fn(),
 }));
 
 vi.mock("@/lib/rewinds", () => ({
@@ -11,9 +12,18 @@ vi.mock("@/lib/rewinds", () => ({
   listFolders: mocks.listFolders,
 }));
 
+vi.mock("@/lib/auth", () => ({
+  getPageSession: mocks.getPageSession,
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: () => {} }),
+  redirect: (url: string) => {
+    throw new Error(`REDIRECT:${url}`);
+  },
 }));
+
+const session = { workspace: { id: "w1" } };
 
 const rewind = {
   id: "seed-r1",
@@ -36,6 +46,8 @@ const folder = { id: "f1", name: "Checkout bugs" };
 beforeEach(() => {
   mocks.listRewinds.mockReset();
   mocks.listFolders.mockReset();
+  mocks.getPageSession.mockReset();
+  mocks.getPageSession.mockResolvedValue(session);
 });
 
 it("loads and renders the seeded Rewinds", async () => {
@@ -68,4 +80,21 @@ it("loads with one Promise.all call for rewinds and folders", async () => {
   await Home({ searchParams: Promise.resolve({}) });
   expect(mocks.listRewinds).toHaveBeenCalledTimes(1);
   expect(mocks.listFolders).toHaveBeenCalledTimes(1);
+});
+
+it("scopes rewinds and folders to the session workspace", async () => {
+  const { default: Home } = await import("./page");
+  mocks.listRewinds.mockResolvedValue([]);
+  mocks.listFolders.mockResolvedValue([]);
+  await Home({ searchParams: Promise.resolve({}) });
+  expect(mocks.listRewinds).toHaveBeenCalledWith("w1");
+  expect(mocks.listFolders).toHaveBeenCalledWith("w1");
+});
+
+it("redirects to /login when there is no session", async () => {
+  const { default: Home } = await import("./page");
+  mocks.getPageSession.mockResolvedValue(null);
+  await expect(
+    Home({ searchParams: Promise.resolve({}) }),
+  ).rejects.toThrow("REDIRECT:/login");
 });

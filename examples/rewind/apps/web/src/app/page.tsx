@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { Library } from "./library";
+import { getPageSession } from "@/lib/auth";
 import { parseLibraryParams } from "@/lib/library";
 import { listFolders, listRewinds } from "@/lib/rewinds";
 
@@ -11,8 +13,14 @@ type Props = {
 };
 
 export default async function Home({ searchParams }: Props) {
+  const session = await getPageSession();
+  if (!session) redirect("/login");
+
   const { view, folder } = parseLibraryParams(await searchParams);
-  const [rewinds, folders] = await Promise.all([listRewinds(), listFolders()]);
+  const [rewinds, folders] = await Promise.all([
+    listRewinds(session.workspace.id),
+    listFolders(session.workspace.id),
+  ]);
   return (
     <Library
       rewinds={rewinds}

@@ -49,6 +49,15 @@ const user = {
   passwordHash: "secret",
   firstName: "A",
   lastName: "B",
+  role: "Engineering" as const,
+  theme: "light" as const,
+  notifyN1: true,
+  notifyN2: true,
+  notifyN3: true,
+  notifyN4: true,
+  notifyN5: true,
+  avatarKey: null,
+  createdAt: new Date("2026-01-01"),
 };
 const workspace = { id: "w1", name: "W" };
 const membership = { workspaceId: "w1", userId: "u1", role: "Admin" };
@@ -260,11 +269,8 @@ describe("requireSession / requireAdmin", () => {
 
 describe("publicUser", () => {
   it("strips passwordHash", () => {
-    expect(publicUser(user)).toEqual({
-      id: "u1",
-      email: "a@example.com",
-      firstName: "A",
-      lastName: "B",
-    });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- dropped on purpose
+    const { passwordHash, ...rest } = user;
+    expect(publicUser(user)).toEqual(rest);
   });
 });

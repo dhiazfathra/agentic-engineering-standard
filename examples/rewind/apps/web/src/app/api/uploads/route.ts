@@ -2,11 +2,15 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { NextResponse } from "next/server";
 import { contentTypeToExtension, newId, uploadRequest } from "@rewind/schema";
+import { requireSession } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { parseBody } from "@/lib/http";
 import { s3 } from "@/lib/storage";
 
 export async function POST(req: Request) {
+  const session = await requireSession(req);
+  if (session instanceof NextResponse) return session;
+
   const parsed = await parseBody(req, uploadRequest);
   if (parsed instanceof NextResponse) return parsed;
 

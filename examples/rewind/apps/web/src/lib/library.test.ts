@@ -184,6 +184,7 @@ describe("libraryReducer", () => {
     durationSeconds: null,
     folderId: "f1" as string | null,
     recordingLinkId: null,
+    errorSignature: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     errorCount: 0,

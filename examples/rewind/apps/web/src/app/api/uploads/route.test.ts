@@ -2,8 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mediaKeyPattern } from "@rewind/schema";
 
 const presign = vi.hoisted(() => vi.fn());
+const requireSession = vi.hoisted(() => vi.fn());
 vi.mock("@aws-sdk/s3-request-presigner", () => ({ getSignedUrl: presign }));
 vi.mock("@/lib/storage", () => ({ s3: {} }));
+vi.mock("@/lib/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth")>();
+  return { ...actual, requireSession };
+});
 
 import { POST } from "./route";
 
@@ -14,7 +19,24 @@ const request = (body: unknown) =>
   });
 
 describe("POST /api/uploads", () => {
-  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    vi.resetAllMocks();
+    requireSession.mockResolvedValue({
+      user: { id: "u1" },
+      workspace: { id: "w1" },
+      membership: { role: "Admin" },
+    });
+  });
+
+  it("401s when unauthenticated", async () => {
+    const { NextResponse } = await import("next/server");
+    requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await POST(request({ contentType: "video/webm" }));
+    expect(res.status).toBe(401);
+    expect(presign).not.toHaveBeenCalled();
+  });
 
   it("returns a presigned url and a key matching mediaKeyPattern", async () => {
     presign.mockResolvedValue("https://minio.example/signed");
