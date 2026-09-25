@@ -61,6 +61,20 @@ test("logging out then visiting / redirects to /login", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
+test("logging out from the workspace menu redirects to /login", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(SEED_EMAIL);
+  await page.getByLabel("Password").fill(SEED_PASSWORD);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page).toHaveURL("/");
+
+  await page.getByRole("button", { name: /Default Workspace/ }).click();
+  await page.getByRole("menuitem", { name: "Log out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 test("a seeded Rewind's link works logged out (defaultLinkAccess anyone)", async ({
   page,
 }) => {

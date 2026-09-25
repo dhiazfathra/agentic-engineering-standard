@@ -16,6 +16,9 @@ import {
 import type { RewindStatus } from "@rewind/schema";
 import { ToastStack, useToast } from "@/components/toast";
 import { copyRewindLink } from "@/lib/copy-link";
+import { pingExtension } from "@/lib/extension";
+import { flags } from "@/lib/flags";
+import { getStartedChecks, getStartedProgress } from "@/lib/get-started";
 import { usePendingDeletes } from "@/lib/use-pending-deletes";
 import {
   boardColumns,
@@ -27,6 +30,7 @@ import {
   nextFolderName,
   paletteItems,
   type LibraryView,
+  type PaletteCommand,
   type PaletteItem,
 } from "@/lib/library";
 import type { FolderListItem, RewindListItem } from "@/lib/rewinds";
@@ -40,13 +44,28 @@ import {
 } from "@/lib/viewer";
 import styles from "./library.module.css";
 
+type Workspace = { id: string; name: string };
+type MembershipRole = "Admin" | "Creator" | "Viewer";
+
 type Props = {
   rewinds: RewindListItem[];
   folders: FolderListItem[];
   view: LibraryView;
   folderId?: string;
   groupDuplicates?: boolean;
+  // Optional so existing library.test.tsx call sites need no changes;
+  // page.tsx always supplies both from the session.
+  workspace?: Workspace;
+  userName?: string;
 };
+
+/** Shell commands the `⌘K` palette can jump to; static, so built once. */
+const SHELL_COMMANDS: PaletteCommand[] = [
+  { id: "links", label: "Go to Recording links" },
+  ...(flags.HELPDESK ? [{ id: "helpdesk", label: "Go to Helpdesk" }] : []),
+  { id: "invite", label: "Invite teammates" },
+  { id: "workspace", label: "Join or create workspace" },
+];
 
 /**
  * `useSyncExternalStore` source for `rw-dark`. `notify` runs after every
@@ -108,8 +127,12 @@ type MenuState = {
 };
 type Editing = { kind: "rewind" | "folder"; id: string } | null;
 
+const DEFAULT_WORKSPACE: Workspace = { id: "", name: "Workspace" };
+
 export function Library(props: Props) {
   const { view, folderId } = props;
+  const workspace = props.workspace ?? DEFAULT_WORKSPACE;
+  const userName = props.userName ?? "";
   const router = useRouter();
   const { toasts, showToast, showActionToast, undo, close } = useToast();
   const [{ rewinds, folders }, dispatch] = useReducer(libraryReducer, {
@@ -145,6 +168,23 @@ export function Library(props: Props) {
   // is absent, so an Undo that restores it shows its name again.
   const [leavingFolderId, setLeavingFolderId] = useState<string | null>(null);
   const [grouped, setGrouped] = useState(props.groupDuplicates ?? true);
+
+  const [wsMenuOpen, setWsMenuOpen] = useState(false);
+  const [wsSubOpen, setWsSubOpen] = useState(false);
+  const [otherWorkspaces, setOtherWorkspaces] = useState<Workspace[]>([]);
+  const [wsModalOpen, setWsModalOpen] = useState(false);
+  const [newWsName, setNewWsName] = useState("");
+  const [joinLink, setJoinLink] = useState("");
+  const [wsBusy, setWsBusy] = useState(false);
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmails, setInviteEmails] = useState("");
+  const [inviteRole, setInviteRole] = useState<MembershipRole>("Creator");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [invitesSent, setInvitesSent] = useState(false);
+
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
 
   const showError = useCallback(
     (text: string) => showToast(text, "error"),
@@ -210,6 +250,146 @@ export function Library(props: Props) {
     } catch {
       revert();
       showError(failText);
+    }
+  };
+
+  // Real signal for the "Invite your team" Get-started check: has anyone
+  // ever been invited to this workspace. Only checked when the checklist is
+  // opened, so the sidebar doesn't fire an extra request on every mount.
+  useEffect(() => {
+    if (!checklistOpen) return;
+    let cancelled = false;
+    fetch("/api/invites")
+      .then((res) => (res.ok ? (res.json() as Promise<unknown[]>) : []))
+      .then((rows) => {
+        if (!cancelled) setInvitesSent(rows.length > 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [checklistOpen]);
+
+  const openWsMenu = () => {
+    setWsMenuOpen(true);
+    fetch("/api/workspaces")
+      .then((res) => (res.ok ? (res.json() as Promise<Workspace[]>) : []))
+      .then((rows) =>
+        setOtherWorkspaces(rows.filter((w) => w.id !== workspace.id)),
+      )
+      .catch(() => {});
+  };
+  const closeWsMenu = () => {
+    setWsMenuOpen(false);
+    setWsSubOpen(false);
+  };
+
+  const logOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  };
+
+  const switchWorkspace = async (id: string) => {
+    const res = await fetch("/api/workspaces/switch", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
+      showError("Could not switch workspace");
+      return;
+    }
+    router.push("/");
+    router.refresh();
+  };
+
+  const openWsModal = () => {
+    closeWsMenu();
+    setNewWsName("");
+    setJoinLink("");
+    setWsModalOpen(true);
+  };
+
+  const createWorkspace = async () => {
+    const name = newWsName.trim();
+    if (!name) return;
+    setWsBusy(true);
+    try {
+      const res = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        showError("Could not create workspace");
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } finally {
+      setWsBusy(false);
+    }
+  };
+
+  const joinWorkspace = async () => {
+    const inviteUrl = joinLink.trim();
+    if (!inviteUrl) return;
+    setWsBusy(true);
+    try {
+      const res = await fetch("/api/workspaces/join", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ inviteUrl }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        showError(body?.error ?? "That invite link isn't valid");
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } finally {
+      setWsBusy(false);
+    }
+  };
+
+  const openInvite = () => {
+    setInviteEmails("");
+    setInviteRole("Creator");
+    setInviteOpen(true);
+  };
+
+  const sendInvite = async () => {
+    const emails = inviteEmails
+      .split(/[\s,]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+    if (emails.length === 0) return;
+    setInviteBusy(true);
+    try {
+      const res = await fetch("/api/invites", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ emails, role: inviteRole }),
+      });
+      if (!res.ok) {
+        showError("Could not send invite");
+        return;
+      }
+      setInviteOpen(false);
+      setInvitesSent(true);
+      showToast(`Invited ${emails.join(", ")}`);
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const startNewRewind = async () => {
+    const found = await pingExtension();
+    if (!found) {
+      showToast("Install the Rewind extension to capture a Rewind");
     }
   };
 
@@ -560,6 +740,22 @@ export function Library(props: Props) {
       case "rewind":
         router.push(`/r/${item.id}`);
         break;
+      case "command":
+        switch (item.id) {
+          case "links":
+            router.push("/links");
+            break;
+          case "helpdesk":
+            router.push("/helpdesk");
+            break;
+          case "invite":
+            openInvite();
+            break;
+          case "workspace":
+            openWsModal();
+            break;
+        }
+        break;
     }
   };
 
@@ -577,13 +773,100 @@ export function Library(props: Props) {
   }, []);
 
   const items = useMemo(
-    () => filterPalette(paletteItems(rewinds, folders, dark), query),
+    () =>
+      filterPalette(
+        paletteItems(rewinds, folders, dark, SHELL_COMMANDS),
+        query,
+      ),
     [rewinds, folders, dark, query],
   );
+
+  const usedExtension = rewinds.some((r) => r.reporterName === userName);
+  const checks = getStartedChecks({
+    hasRewinds: rewinds.length > 0,
+    usedExtension,
+    invitesSent,
+  });
+  const checkProgress = getStartedProgress(checks);
+  const workspaceInitials = initials(workspace.name);
 
   return (
     <div className={styles.page}>
       <aside className={styles.sidebar}>
+        <div style={{ position: "relative" }}>
+          <button
+            type="button"
+            className={styles.workspaceButton}
+            onClick={() => (wsMenuOpen ? closeWsMenu() : openWsMenu())}
+          >
+            <span className={styles.workspaceAvatar}>{workspaceInitials}</span>
+            <span className={styles.workspaceName}>{workspace.name}</span>
+          </button>
+          {wsMenuOpen && (
+            <>
+              <div className={styles.menuBackdrop} onClick={closeWsMenu} />
+              <div className={styles.wsMenu} role="menu">
+                <div className={styles.wsMenuHeader}>
+                  <span className={styles.workspaceAvatar}>
+                    {workspaceInitials}
+                  </span>
+                  <span className={styles.workspaceName}>
+                    {workspace.name}
+                  </span>
+                </div>
+                <Link
+                  href="/settings/general"
+                  className={styles.menuItem}
+                  role="menuitem"
+                >
+                  Settings
+                </Link>
+                <div style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    role="menuitem"
+                    onMouseEnter={() => setWsSubOpen(true)}
+                    onClick={() => setWsSubOpen((open) => !open)}
+                  >
+                    Switch workspace
+                  </button>
+                  {wsSubOpen && (
+                    <div className={styles.wsSubmenu} role="menu">
+                      {otherWorkspaces.map((w) => (
+                        <button
+                          key={w.id}
+                          type="button"
+                          className={styles.menuItem}
+                          role="menuitem"
+                          onClick={() => void switchWorkspace(w.id)}
+                        >
+                          {w.name}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className={styles.menuItem}
+                        role="menuitem"
+                        onClick={openWsModal}
+                      >
+                        Join or create workspace
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className={styles.menuItem}
+                  role="menuitem"
+                  onClick={() => void logOut()}
+                >
+                  Log out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
         <button type="button" className={styles.search} onClick={openPalette}>
           <span className={styles.searchLabel}>Search or jump to…</span>
           <span className={styles.kbd}>⌘K</span>
@@ -596,6 +879,14 @@ export function Library(props: Props) {
         >
           All Rewinds
         </button>
+        <Link href="/links" className={styles.navItem}>
+          Recording links
+        </Link>
+        {flags.HELPDESK && (
+          <Link href="/helpdesk" className={styles.navItem}>
+            Helpdesk
+          </Link>
+        )}
         <div className={styles.foldersHeading}>
           Folders
           <button
@@ -644,16 +935,92 @@ export function Library(props: Props) {
             </div>
           ),
         )}
-        <button
-          type="button"
-          className={styles.themeToggle}
-          aria-pressed={dark}
-          aria-label="Toggle dark mode"
-          onClick={() => toggleDark(!dark)}
-        >
-          <span aria-hidden="true">{dark ? "☀" : "🌙"}</span>
-          Toggle dark mode
-        </button>
+        <div className={styles.getStarted}>
+          <button
+            type="button"
+            className={styles.getStartedButton}
+            onClick={() => setChecklistOpen((open) => !open)}
+          >
+            <span className={styles.getStartedTitle}>Get started</span>
+            <span className={styles.getStartedLabel}>
+              {checkProgress.done} of {checkProgress.total} done
+            </span>
+          </button>
+          {checklistOpen && (
+            <div className={styles.getStartedList}>
+              {checks.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  className={`${styles.getStartedCheck} ${c.done ? styles.getStartedDone : ""}`}
+                  onClick={
+                    c.key === "invite"
+                      ? openInvite
+                      : () => void startNewRewind()
+                  }
+                >
+                  <span
+                    className={`${styles.checkDot} ${c.done ? styles.checkDotDone : ""}`}
+                  />
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className={styles.bottomRow}>
+          <button
+            type="button"
+            className={styles.iconButton}
+            aria-label="Help"
+            onClick={() => setHelpOpen((open) => !open)}
+          >
+            ?
+          </button>
+          {helpOpen && (
+            <>
+              <div
+                className={styles.menuBackdrop}
+                onClick={() => setHelpOpen(false)}
+              />
+              <div className={styles.helpMenu} role="menu">
+                {flags.EXTERNAL_LINKS && (
+                  <>
+                    <a
+                      href="https://rewind.dev/docs"
+                      target="_blank"
+                      rel="noreferrer"
+                      className={styles.menuItem}
+                      role="menuitem"
+                    >
+                      Docs
+                    </a>
+                    <a
+                      href="mailto:support@rewind.dev"
+                      className={styles.menuItem}
+                      role="menuitem"
+                    >
+                      Contact support
+                    </a>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+          <button
+            type="button"
+            className={styles.themeToggle}
+            aria-pressed={dark}
+            aria-label="Toggle dark mode"
+            onClick={() => toggleDark(!dark)}
+          >
+            <span aria-hidden="true">{dark ? "☀" : "🌙"}</span>
+          </button>
+          <div className={styles.spacer} />
+          <Link href="/settings/general" className={styles.settingsLink}>
+            Settings
+          </Link>
+        </div>
       </aside>
 
       <div className={styles.main}>
@@ -691,6 +1058,20 @@ export function Library(props: Props) {
               Group duplicates
             </button>
           )}
+          <button
+            type="button"
+            className={styles.headerButton}
+            onClick={openInvite}
+          >
+            Invite
+          </button>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={() => void startNewRewind()}
+          >
+            New Rewind
+          </button>
         </header>
 
         <div className={styles.body}>
@@ -858,6 +1239,127 @@ export function Library(props: Props) {
           onClose={closePalette}
         />
       )}
+      {wsModalOpen && (
+        <div className={styles.modalScrim} onClick={() => setWsModalOpen(false)}>
+          <div
+            className={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <span className={styles.modalTitle}>
+                Join or create workspace
+              </span>
+              <button
+                type="button"
+                className={styles.modalClose}
+                aria-label="Close"
+                onClick={() => setWsModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <label className={styles.modalLabel} htmlFor="new-workspace-name">
+              Create a new workspace
+            </label>
+            <div className={styles.modalRow}>
+              <input
+                id="new-workspace-name"
+                className={styles.modalInput}
+                placeholder="Workspace name"
+                value={newWsName}
+                onChange={(e) => setNewWsName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void createWorkspace();
+                }}
+              />
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={wsBusy || !newWsName.trim()}
+                onClick={() => void createWorkspace()}
+              >
+                Create
+              </button>
+            </div>
+            <div className={styles.modalDivider}>or</div>
+            <label className={styles.modalLabel} htmlFor="join-workspace-link">
+              Join with an invite link
+            </label>
+            <div className={styles.modalRow}>
+              <input
+                id="join-workspace-link"
+                className={styles.modalInput}
+                placeholder="https://…/team-invite/…"
+                value={joinLink}
+                onChange={(e) => setJoinLink(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void joinWorkspace();
+                }}
+              />
+              <button
+                type="button"
+                className={styles.headerButton}
+                disabled={wsBusy || !joinLink.trim()}
+                onClick={() => void joinWorkspace()}
+              >
+                Join
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {inviteOpen && (
+        <div className={styles.modalScrim} onClick={() => setInviteOpen(false)}>
+          <div
+            className={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <span className={styles.modalTitle}>Add members</span>
+              <button
+                type="button"
+                className={styles.modalClose}
+                aria-label="Close"
+                onClick={() => setInviteOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className={styles.modalRow}>
+              <input
+                className={styles.modalInput}
+                placeholder="Separate emails with a space"
+                aria-label="Emails to invite"
+                value={inviteEmails}
+                onChange={(e) => setInviteEmails(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void sendInvite();
+                }}
+              />
+              <select
+                className={styles.modalSelect}
+                aria-label="Role"
+                value={inviteRole}
+                onChange={(e) =>
+                  setInviteRole(e.target.value as MembershipRole)
+                }
+              >
+                <option>Creator</option>
+                <option>Admin</option>
+                <option>Viewer</option>
+              </select>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={inviteBusy || !inviteEmails.trim()}
+                onClick={() => void sendInvite()}
+              >
+                Invite
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -954,6 +1456,7 @@ const PALETTE_KIND_LABEL: Record<PaletteItem["kind"], string> = {
   view: "View",
   theme: "Appearance",
   rewind: "Rewind",
+  command: "Action",
 };
 
 function paletteItemKey(item: PaletteItem): string {

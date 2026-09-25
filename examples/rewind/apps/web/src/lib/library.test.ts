@@ -149,6 +149,25 @@ describe("paletteItems", () => {
       label: "Switch to light mode",
     });
   });
+
+  it("places shell commands between the theme toggle and Rewinds", () => {
+    const items = paletteItems(
+      [{ id: "r1", title: "Bug" }],
+      [],
+      false,
+      [{ id: "invite", label: "Invite teammates" }],
+    );
+    expect(items).toContainEqual({
+      kind: "command",
+      id: "invite",
+      label: "Invite teammates",
+    });
+    const commandIndex = items.findIndex((i) => i.kind === "command");
+    const themeIndex = items.findIndex((i) => i.kind === "theme");
+    const rewindIndex = items.findIndex((i) => i.kind === "rewind");
+    expect(commandIndex).toBeGreaterThan(themeIndex);
+    expect(commandIndex).toBeLessThan(rewindIndex);
+  });
 });
 
 describe("filterPalette", () => {

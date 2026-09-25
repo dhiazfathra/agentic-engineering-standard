@@ -6,9 +6,13 @@ import type { FolderListItem, RewindListItem } from "@/lib/rewinds";
 
 const replace = vi.fn();
 const push = vi.fn();
+const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace, push }),
+  useRouter: () => ({ replace, push, refresh }),
 }));
+
+const pingExtension = vi.fn();
+vi.mock("@/lib/extension", () => ({ pingExtension }));
 
 const { Library } = await import("./library");
 
@@ -60,6 +64,12 @@ function click(el: HTMLElement) {
   });
 }
 
+function hover(el: HTMLElement) {
+  act(() => {
+    el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+  });
+}
+
 function stubClipboard(writeText: (text: string) => Promise<void>) {
   Object.defineProperty(navigator, "clipboard", {
     value: { writeText },
@@ -76,6 +86,8 @@ beforeEach(() => {
   root = createRoot(container);
   replace.mockReset();
   push.mockReset();
+  refresh.mockReset();
+  pingExtension.mockReset();
   document.body.className = "";
   stubClipboard(vi.fn().mockResolvedValue(undefined));
 });
@@ -381,6 +393,12 @@ function blur(el: HTMLElement) {
 
 function menuItem(label: string): HTMLElement {
   return qAll('[role="menuitem"]').find((b) => b.textContent === label)!;
+}
+
+function checkItem(label: string): HTMLElement {
+  return qAll('[class*="getStartedCheck"]').find((b) =>
+    b.textContent?.includes(label),
+  )!;
 }
 
 function mountOne(view: "grid" | "list" | "board" = "grid") {
@@ -1820,5 +1838,478 @@ describe("dark mode", () => {
     const toggle = q('[aria-label="Toggle dark mode"]');
     click(toggle);
     expect(document.body.classList.contains("rw-dark")).toBe(true);
+  });
+});
+
+function mountShell() {
+  mount(
+    <Library
+      rewinds={[rewind()]}
+      folders={[]}
+      view="grid"
+      folderId={undefined}
+      workspace={{ id: "w1", name: "Acme" }}
+      userName="Dhiaz Fathra"
+    />,
+  );
+}
+
+function jsonFetchFor(map: Record<string, unknown>, ok = true) {
+  return vi.fn((url: string) => {
+    const body = url in map ? map[url] : {};
+    return Promise.resolve(
+      new Response(JSON.stringify(body), { status: ok ? 200 : 500 }),
+    );
+  });
+}
+
+describe("workspace menu", () => {
+  it("opens on click, lists other workspaces, and closes on backdrop click", async () => {
+    const fetchMock = jsonFetchFor({
+      "/api/workspaces": [
+        { id: "w1", name: "Acme" },
+        { id: "w2", name: "Other" },
+      ],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/workspaces");
+    click(menuItem("Switch workspace"));
+    expect(menuItem("Other")).toBeTruthy();
+    click(q('[class*="menuBackdrop"]'));
+    expect(qAll('[role="menu"]').length).toBe(0);
+  });
+
+  it("shows no other workspaces when the list fetch fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("", { status: 500 }))),
+    );
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    await flush();
+    click(menuItem("Switch workspace"));
+    expect(qAll('[role="menu"]').length).toBe(2);
+  });
+
+  it("closes again when clicked while open", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({ "/api/workspaces": [] }));
+    mountShell();
+    const button = q('[class*="workspaceButton"]');
+    click(button);
+    await flush();
+    click(button);
+    expect(qAll('[role="menu"]').length).toBe(0);
+  });
+
+  it("opens the switch-workspace submenu and switches on click", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchFor({
+        "/api/workspaces": [{ id: "w2", name: "Other" }],
+      }),
+    );
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    await flush();
+    click(menuItem("Switch workspace"));
+    click(menuItem("Other"));
+    await flush();
+    expect(push).toHaveBeenCalledWith("/");
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("opens the switch-workspace submenu on hover", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({ "/api/workspaces": [] }));
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    await flush();
+    hover(menuItem("Switch workspace"));
+    expect(qAll('[role="menu"]').length).toBe(2);
+  });
+
+  it("shows an error and does not navigate when switching fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              url === "/api/workspaces" ? [{ id: "w2", name: "Other" }] : {},
+            ),
+            { status: url === "/api/workspaces/switch" ? 500 : 200 },
+          ),
+        ),
+      ),
+    );
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    await flush();
+    click(menuItem("Switch workspace"));
+    click(menuItem("Other"));
+    await flush();
+    expect(push).not.toHaveBeenCalledWith("/");
+    expect(container.textContent).toContain("Could not switch workspace");
+  });
+
+  it("opens the workspace modal from the submenu and closes the menu", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({ "/api/workspaces": [] }));
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    await flush();
+    click(menuItem("Switch workspace"));
+    click(menuItem("Join or create workspace"));
+    expect(qAll('[role="menu"]').length).toBe(0);
+    expect(q('[id="new-workspace-name"]')).toBeTruthy();
+  });
+
+  it("logs out and redirects to /login", async () => {
+    const fetchMock = stubFetch();
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    await flush();
+    click(menuItem("Log out"));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/logout", {
+      method: "POST",
+    });
+    expect(push).toHaveBeenCalledWith("/login");
+  });
+});
+
+describe("workspace modal", () => {
+  function openModal() {
+    vi.stubGlobal("fetch", jsonFetchFor({ "/api/workspaces": [] }));
+    mountShell();
+    click(q('[class*="workspaceButton"]'));
+    click(menuItem("Switch workspace"));
+    click(menuItem("Join or create workspace"));
+  }
+
+  it("does nothing when creating with a blank name", () => {
+    openModal();
+    key(q('[id="new-workspace-name"]'), "Enter");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("ignores other keys in the name and link inputs", () => {
+    openModal();
+    key(q('[id="new-workspace-name"]'), "a");
+    key(q('[id="join-workspace-link"]'), "a");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("creates a workspace and navigates on success", async () => {
+    openModal();
+    const fetchMock = stubFetch();
+    type(q('[id="new-workspace-name"]') as HTMLInputElement, "New Co");
+    key(q('[id="new-workspace-name"]'), "Enter");
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/workspaces",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(push).toHaveBeenCalledWith("/");
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("shows an error when creating a workspace fails", async () => {
+    openModal();
+    stubFetch(false);
+    type(q('[id="new-workspace-name"]') as HTMLInputElement, "New Co");
+    click(
+      q('[id="new-workspace-name"]').nextElementSibling as HTMLElement,
+    );
+    await flush();
+    expect(container.textContent).toContain("Could not create workspace");
+  });
+
+  it("does nothing when joining with a blank link", () => {
+    openModal();
+    key(q('[id="join-workspace-link"]'), "Enter");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("joins a workspace and navigates on success", async () => {
+    openModal();
+    const fetchMock = stubFetch();
+    type(
+      q('[id="join-workspace-link"]') as HTMLInputElement,
+      "https://x/invite/1",
+    );
+    key(q('[id="join-workspace-link"]'), "Enter");
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/workspaces/join",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(push).toHaveBeenCalledWith("/");
+  });
+
+  it("shows the server's error message when joining fails", async () => {
+    openModal();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ error: "Invalid invite link" }), {
+            status: 400,
+          }),
+        ),
+      ),
+    );
+    type(
+      q('[id="join-workspace-link"]') as HTMLInputElement,
+      "https://x/invite/1",
+    );
+    click(
+      q('[id="join-workspace-link"]').nextElementSibling as HTMLElement,
+    );
+    await flush();
+    expect(container.textContent).toContain("Invalid invite link");
+  });
+
+  it("falls back to a generic error when the join error body isn't JSON", async () => {
+    openModal();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("oops", { status: 400 }))),
+    );
+    type(
+      q('[id="join-workspace-link"]') as HTMLInputElement,
+      "https://x/invite/1",
+    );
+    click(
+      q('[id="join-workspace-link"]').nextElementSibling as HTMLElement,
+    );
+    await flush();
+    expect(container.textContent).toContain("That invite link isn't valid");
+  });
+
+  it("closes on the ✕ button", () => {
+    openModal();
+    click(q('[aria-label="Close"]'));
+    expect(qAll('[id="new-workspace-name"]').length).toBe(0);
+  });
+
+  it("closes when clicking the scrim outside the card", () => {
+    openModal();
+    click(q('[class*="modalScrim"]'));
+    expect(qAll('[id="new-workspace-name"]').length).toBe(0);
+  });
+});
+
+describe("invite modal", () => {
+  it("opens from the header Invite button and does nothing with blank emails", () => {
+    const fetchMock = jsonFetchFor({});
+    vi.stubGlobal("fetch", fetchMock);
+    mountShell();
+    click(qAll('[class*="headerButton"]')[0]);
+    expect(q('[aria-label="Emails to invite"]')).toBeTruthy();
+    key(q('[aria-label="Emails to invite"]'), "Enter");
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/invites",
+      expect.anything(),
+    );
+  });
+
+  it("ignores other keys in the emails input", () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="headerButton"]')[0]);
+    key(q('[aria-label="Emails to invite"]'), "a");
+    expect(q('[aria-label="Emails to invite"]')).toBeTruthy();
+  });
+
+  it("sends an invite and shows a toast on success", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="headerButton"]')[0]);
+    type(q('[aria-label="Emails to invite"]') as HTMLInputElement, "a@b.co, c@d.co");
+    const fetchMock = stubFetch();
+    click(q('[class*="modalCard"] [class*="primaryButton"]'));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/invites",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(container.textContent).toContain("Invited a@b.co, c@d.co");
+    expect(qAll('[aria-label="Emails to invite"]').length).toBe(0);
+  });
+
+  it("shows an error toast when sending fails", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="headerButton"]')[0]);
+    type(q('[aria-label="Emails to invite"]') as HTMLInputElement, "a@b.co");
+    stubFetch(false);
+    click(q('[class*="modalCard"] [class*="primaryButton"]'));
+    await flush();
+    expect(container.textContent).toContain("Could not send invite");
+  });
+
+  it("closes on the ✕ button", () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="headerButton"]')[0]);
+    click(q('[aria-label="Close"]'));
+    expect(qAll('[aria-label="Emails to invite"]').length).toBe(0);
+  });
+
+  it("closes when clicking the scrim outside the card", () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="headerButton"]')[0]);
+    click(q('[class*="modalScrim"]'));
+    expect(qAll('[aria-label="Emails to invite"]').length).toBe(0);
+  });
+
+  it("changes the invited role", () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="headerButton"]')[0]);
+    const select = q('[aria-label="Role"]') as HTMLSelectElement;
+    select.value = "Admin";
+    act(() => {
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(select.value).toBe("Admin");
+  });
+});
+
+describe("Get started checklist", () => {
+  it("toggles open and closed, showing progress and fetching invite status", async () => {
+    const fetchMock = jsonFetchFor({
+      "/api/invites": [{ id: "i1", email: "a@b.co" }],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    mountShell();
+    expect(container.textContent).toContain("of 3 done");
+    click(q('[class*="getStartedButton"]'));
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/invites");
+    expect(container.textContent).toContain("Invite your team");
+    click(q('[class*="getStartedButton"]'));
+    expect(container.textContent).not.toContain("Invite your team");
+  });
+
+  it("ignores a failed invite-status fetch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new Error("network"))),
+    );
+    mountShell();
+    click(q('[class*="getStartedButton"]'));
+    await flush();
+    expect(container.textContent).toContain("Invite your team");
+  });
+
+  it("treats a non-ok invite-status response as no invites sent", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("", { status: 500 }))),
+    );
+    mountShell();
+    click(q('[class*="getStartedButton"]'));
+    await flush();
+    expect(container.textContent).toContain("Invite your team");
+  });
+
+  it("ignores the invite-status response if the checklist closes first", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({ "/api/invites": [{ id: "i1" }] }));
+    mountShell();
+    click(q('[class*="getStartedButton"]'));
+    click(q('[class*="getStartedButton"]'));
+    await flush();
+    click(q('[class*="getStartedButton"]'));
+    expect(container.textContent).toContain("Invite your team");
+  });
+
+  it("opens the invite modal from the invite check", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({ "/api/invites": [] }));
+    mountShell();
+    click(q('[class*="getStartedButton"]'));
+    await flush();
+    click(checkItem("Invite your team"));
+    expect(q('[aria-label="Emails to invite"]')).toBeTruthy();
+  });
+
+  it("pings for the extension from a non-invite check", async () => {
+    pingExtension.mockResolvedValue(false);
+    vi.stubGlobal("fetch", jsonFetchFor({ "/api/invites": [] }));
+    mountShell();
+    click(q('[class*="getStartedButton"]'));
+    await flush();
+    click(checkItem("Capture your first Rewind"));
+    await flush();
+    expect(pingExtension).toHaveBeenCalled();
+    expect(container.textContent).toContain(
+      "Install the Rewind extension to capture a Rewind",
+    );
+  });
+});
+
+describe("New Rewind button", () => {
+  it("shows a toast when no extension answers", async () => {
+    pingExtension.mockResolvedValue(false);
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="primaryButton"]')[0]);
+    await flush();
+    expect(pingExtension).toHaveBeenCalled();
+    expect(container.textContent).toContain(
+      "Install the Rewind extension to capture a Rewind",
+    );
+  });
+
+  it("does not toast when the extension answers", async () => {
+    pingExtension.mockResolvedValue(true);
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(qAll('[class*="primaryButton"]')[0]);
+    await flush();
+    expect(container.textContent).not.toContain("Install Rewind extension");
+  });
+});
+
+describe("Help popover", () => {
+  it("toggles open and closed on the ? button", () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    click(q('[aria-label="Help"]'));
+    expect(qAll('[role="menu"]').length).toBe(1);
+    click(q('[class*="menuBackdrop"]'));
+    expect(qAll('[role="menu"]').length).toBe(0);
+  });
+});
+
+describe("palette shell commands", () => {
+  it("navigates to Recording links", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    openPalette();
+    type(paletteInput(), "Recording links");
+    key(paletteInput(), "Enter");
+    expect(push).toHaveBeenCalledWith("/links");
+  });
+
+  it("opens the invite modal from the palette", () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    openPalette();
+    type(paletteInput(), "Invite teammates");
+    key(paletteInput(), "Enter");
+    expect(q('[aria-label="Emails to invite"]')).toBeTruthy();
+  });
+
+  it("opens the workspace modal from the palette", () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mountShell();
+    openPalette();
+    type(paletteInput(), "Join or create workspace");
+    key(paletteInput(), "Enter");
+    expect(q('[id="new-workspace-name"]')).toBeTruthy();
   });
 });

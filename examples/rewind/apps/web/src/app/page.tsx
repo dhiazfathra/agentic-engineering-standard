@@ -28,6 +28,8 @@ export default async function Home({ searchParams }: Props) {
       view={view}
       folderId={folder}
       groupDuplicates={session.workspace.groupDuplicates}
+      workspace={{ id: session.workspace.id, name: session.workspace.name }}
+      userName={`${session.user.firstName} ${session.user.lastName}`}
     />
   );
 }

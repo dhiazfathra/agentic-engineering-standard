@@ -103,7 +103,8 @@ export type PaletteItem =
   | { kind: "folder"; id: string; label: string }
   | { kind: "view"; id: LibraryView; label: string }
   | { kind: "theme"; dark: boolean; label: string }
-  | { kind: "rewind"; id: string; label: string };
+  | { kind: "rewind"; id: string; label: string }
+  | { kind: "command"; id: string; label: string };
 
 const VIEW_LABEL: Record<LibraryView, string> = {
   grid: "Switch to grid view",
@@ -111,11 +112,15 @@ const VIEW_LABEL: Record<LibraryView, string> = {
   board: "Switch to board view",
 };
 
-/** Every palette item: All Rewinds, folders, views, theme, then Rewinds. */
+/** A shell action the palette can jump to (see `SHELL_COMMANDS` below). */
+export type PaletteCommand = { id: string; label: string };
+
+/** Every palette item: All Rewinds, folders, views, theme, commands, then Rewinds. */
 export function paletteItems(
   rewinds: { id: string; title: string }[],
   folders: { id: string; name: string }[],
   dark: boolean,
+  commands: PaletteCommand[] = [],
 ): PaletteItem[] {
   return [
     { kind: "all", label: "Go to All Rewinds" },
@@ -134,6 +139,11 @@ export function paletteItems(
       dark: !dark,
       label: dark ? "Switch to light mode" : "Switch to dark mode",
     },
+    ...commands.map((c): PaletteItem => ({
+      kind: "command",
+      id: c.id,
+      label: c.label,
+    })),
     ...rewinds.map((r): PaletteItem => ({
       kind: "rewind",
       id: r.id,

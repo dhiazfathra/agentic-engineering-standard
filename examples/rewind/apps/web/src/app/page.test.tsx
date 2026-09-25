@@ -23,7 +23,10 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-const session = { workspace: { id: "w1" } };
+const session = {
+  workspace: { id: "w1", name: "Acme" },
+  user: { firstName: "Dhiaz", lastName: "Fathra" },
+};
 
 const rewind = {
   id: "seed-r1",

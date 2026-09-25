@@ -25,21 +25,47 @@ const restrictedAdminSession = {
 
 const mocks = vi.hoisted(() => ({
   insert: vi.fn(),
+  findMany: vi.fn(),
   requireSession: vi.fn(),
 }));
-vi.mock("@/lib/db", () => ({ db: { insert: mocks.insert } }));
+vi.mock("@/lib/db", () => ({
+  db: { insert: mocks.insert, query: { invites: { findMany: mocks.findMany } } },
+}));
 vi.mock("@/lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/auth")>();
   return { ...actual, requireSession: mocks.requireSession };
 });
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const request = (body: unknown) =>
   new Request("http://localhost/api/invites", {
     method: "POST",
     body: JSON.stringify(body),
   });
+
+describe("GET /api/invites", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.requireSession.mockResolvedValue(openSession);
+  });
+
+  it("401s without a session", async () => {
+    const { NextResponse } = await import("next/server");
+    mocks.requireSession.mockResolvedValue(
+      NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    );
+    const res = await GET(new Request("http://localhost/api/invites"));
+    expect(res.status).toBe(401);
+  });
+
+  it("lists the workspace's invites for any member", async () => {
+    mocks.findMany.mockResolvedValue([{ id: "i1", email: "a@b.co" }]);
+    const res = await GET(new Request("http://localhost/api/invites"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual([{ id: "i1", email: "a@b.co" }]);
+  });
+});
 
 describe("POST /api/invites", () => {
   beforeEach(() => {
