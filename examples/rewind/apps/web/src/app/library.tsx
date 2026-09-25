@@ -14,6 +14,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import type { RewindStatus } from "@rewind/schema";
+import { SupportWidget, type SupportView } from "@/components/support-widget";
 import { ToastStack, useToast } from "@/components/toast";
 import { copyRewindLink } from "@/lib/copy-link";
 import { pingExtension } from "@/lib/extension";
@@ -65,6 +66,13 @@ const SHELL_COMMANDS: PaletteCommand[] = [
   ...(flags.HELPDESK ? [{ id: "helpdesk", label: "Go to Helpdesk" }] : []),
   { id: "invite", label: "Invite teammates" },
   { id: "workspace", label: "Join or create workspace" },
+  { id: "settings", label: "Go to Settings" },
+  { id: "members", label: "Go to Members" },
+  ...(flags.BILLING ? [{ id: "billing", label: "Go to Billing" }] : []),
+  ...(flags.INTEGRATIONS
+    ? [{ id: "integrations", label: "Go to Integrations" }]
+    : []),
+  ...(flags.BILLING ? [{ id: "pricing", label: "See pricing" }] : []),
 ];
 
 /**
@@ -182,8 +190,10 @@ export function Library(props: Props) {
   const [inviteRole, setInviteRole] = useState<MembershipRole>("Creator");
   const [inviteBusy, setInviteBusy] = useState(false);
   const [invitesSent, setInvitesSent] = useState(false);
+  const [hasIntegration, setHasIntegration] = useState(false);
 
   const [helpOpen, setHelpOpen] = useState(false);
+  const [supportView, setSupportView] = useState<SupportView | null>(null);
   const [checklistOpen, setChecklistOpen] = useState(false);
 
   const showError = useCallback(
@@ -263,6 +273,23 @@ export function Library(props: Props) {
       .then((res) => (res.ok ? (res.json() as Promise<unknown[]>) : []))
       .then((rows) => {
         if (!cancelled) setInvitesSent(rows.length > 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [checklistOpen]);
+
+  // Real signal for the "Connect an integration" Get-started check. Only
+  // checked when the checklist is opened, and only when the flag that
+  // gates the check is itself on (see get-started.ts).
+  useEffect(() => {
+    if (!checklistOpen || !flags.INTEGRATIONS) return;
+    let cancelled = false;
+    fetch("/api/integrations")
+      .then((res) => (res.ok ? (res.json() as Promise<string[]>) : []))
+      .then((names) => {
+        if (!cancelled) setHasIntegration(names.length > 0);
       })
       .catch(() => {});
     return () => {
@@ -754,6 +781,19 @@ export function Library(props: Props) {
           case "workspace":
             openWsModal();
             break;
+          case "settings":
+            router.push("/settings/general");
+            break;
+          case "members":
+            router.push("/settings/members");
+            break;
+          case "billing":
+          case "pricing":
+            router.push("/settings/billing");
+            break;
+          case "integrations":
+            router.push("/settings/integrations");
+            break;
         }
         break;
     }
@@ -786,6 +826,8 @@ export function Library(props: Props) {
     hasRewinds: rewinds.length > 0,
     usedExtension,
     invitesSent,
+    integrationsEnabled: flags.INTEGRATIONS,
+    hasIntegration,
   });
   const checkProgress = getStartedProgress(checks);
   const workspaceInitials = initials(workspace.name);
@@ -956,7 +998,9 @@ export function Library(props: Props) {
                   onClick={
                     c.key === "invite"
                       ? openInvite
-                      : () => void startNewRewind()
+                      : c.key === "integration"
+                        ? () => router.push("/settings/integrations")
+                        : () => void startNewRewind()
                   }
                 >
                   <span
@@ -1004,8 +1048,51 @@ export function Library(props: Props) {
                     </a>
                   </>
                 )}
+                {flags.SUPPORT_WIDGET && (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setHelpOpen(false);
+                        setSupportView("messages");
+                      }}
+                    >
+                      Report an issue
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setHelpOpen(false);
+                        setSupportView("messages");
+                      }}
+                    >
+                      Contact support
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.menuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setHelpOpen(false);
+                        setSupportView("status");
+                      }}
+                    >
+                      System status
+                    </button>
+                  </>
+                )}
               </div>
             </>
+          )}
+          {supportView && (
+            <SupportWidget
+              initialView={supportView}
+              onClose={() => setSupportView(null)}
+            />
           )}
           <button
             type="button"

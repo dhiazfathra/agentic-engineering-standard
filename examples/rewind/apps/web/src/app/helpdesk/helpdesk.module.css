@@ -1,0 +1,79 @@
+.page {
+  min-height: 100vh;
+  background: var(--rw-bg);
+  color: var(--rw-body);
+  padding: 24px 32px;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 40px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rw-muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--rw-ink);
+}
+
+.hero {
+  max-width: 640px;
+  margin: 80px auto 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.title {
+  font: 600 32px Poppins, sans-serif;
+  color: var(--rw-ink);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--rw-muted);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.primaryButton {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: var(--rw-btn);
+  color: var(--rw-btn-fg);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.primaryButton:hover {
+  background: var(--rw-btn-hover);
+}
+
+.secondaryButton {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: var(--rw-surface2);
+  color: var(--rw-ink);
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+}
+
+.secondaryButton:hover {
+  background: var(--rw-soft);
+}

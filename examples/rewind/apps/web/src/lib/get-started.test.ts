@@ -37,6 +37,38 @@ describe("getStartedChecks", () => {
   });
 });
 
+describe("integration check", () => {
+  it("is omitted when integrations are not enabled", () => {
+    const checks = getStartedChecks({
+      hasRewinds: false,
+      usedExtension: false,
+      invitesSent: false,
+    });
+    expect(checks.find((c) => c.key === "integration")).toBeUndefined();
+  });
+
+  it("is included and todo when integrations are enabled but none connected", () => {
+    const checks = getStartedChecks({
+      hasRewinds: false,
+      usedExtension: false,
+      invitesSent: false,
+      integrationsEnabled: true,
+    });
+    expect(checks.find((c) => c.key === "integration")!.done).toBe(false);
+  });
+
+  it("is done once an integration is connected", () => {
+    const checks = getStartedChecks({
+      hasRewinds: false,
+      usedExtension: false,
+      invitesSent: false,
+      integrationsEnabled: true,
+      hasIntegration: true,
+    });
+    expect(checks.find((c) => c.key === "integration")!.done).toBe(true);
+  });
+});
+
 describe("getStartedProgress", () => {
   it("counts done against total", () => {
     const checks = getStartedChecks({

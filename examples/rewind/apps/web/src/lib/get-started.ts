@@ -1,12 +1,12 @@
 /**
  * The library sidebar's "Get started" checklist. Pure so it can be unit
  * tested without mounting the component; SPEC-design-parity.md § Screens
- * lists exactly these three checks as real (a fourth, integration
- * connected, is deferred: it needs the `INTEGRATIONS`-flagged routes that
- * chunk 7 adds).
+ * lists three checks as always real, plus a 4th "integration connected"
+ * check once chunk 7's `INTEGRATIONS`-flagged routes exist — included
+ * only when that flag is on, same as the nav item and settings tab.
  */
 export type GetStartedCheck = {
-  key: "extension" | "firstRewind" | "invite";
+  key: "extension" | "firstRewind" | "invite" | "integration";
   label: string;
   done: boolean;
 };
@@ -15,6 +15,8 @@ export function getStartedChecks(input: {
   hasRewinds: boolean;
   usedExtension: boolean;
   invitesSent: boolean;
+  integrationsEnabled?: boolean;
+  hasIntegration?: boolean;
 }): GetStartedCheck[] {
   return [
     {
@@ -32,6 +34,15 @@ export function getStartedChecks(input: {
       label: "Invite your team",
       done: input.invitesSent,
     },
+    ...(input.integrationsEnabled
+      ? [
+          {
+            key: "integration" as const,
+            label: "Connect an integration",
+            done: Boolean(input.hasIntegration),
+          },
+        ]
+      : []),
   ];
 }
 

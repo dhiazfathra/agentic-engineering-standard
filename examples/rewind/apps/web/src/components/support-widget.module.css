@@ -1,0 +1,120 @@
+.panel {
+  position: fixed;
+  right: 20px;
+  bottom: 76px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  max-height: 480px;
+  background: var(--rw-surface);
+  border: 1px solid var(--rw-border);
+  border-radius: 16px;
+  box-shadow: var(--rw-pop);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 70;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--rw-border);
+  font: 600 14px Poppins, sans-serif;
+  color: var(--rw-ink);
+}
+
+.back {
+  background: none;
+  border: none;
+  color: var(--rw-muted);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+}
+
+.close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--rw-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.body {
+  flex: 1;
+  overflow: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.homeItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--rw-border);
+  border-radius: 10px;
+  background: none;
+  font-size: 14px;
+  color: var(--rw-ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.homeItem:hover {
+  background: var(--rw-surface2);
+}
+
+.message {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  max-width: 85%;
+}
+
+.messageMine {
+  align-self: flex-end;
+  background: var(--rw-soft);
+  color: var(--rw-accent-ink);
+}
+
+.messageReply {
+  align-self: flex-start;
+  background: var(--rw-surface2);
+  color: var(--rw-body);
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--rw-border);
+}
+
+.composer input {
+  flex: 1;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--rw-border);
+  background: var(--rw-surface);
+  color: var(--rw-ink);
+  font-size: 13px;
+}
+
+.send {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--rw-btn);
+  color: var(--rw-btn-fg);
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
