@@ -96,6 +96,83 @@ export const createRecordingLink = z.object({
   name: z.string().min(1).max(100),
 });
 
+// Accounts and workspaces.
+
+export const userRole = z.enum([
+  "Engineering",
+  "Product",
+  "Design",
+  "QA",
+  "Support",
+]);
+export const membershipRole = z.enum(["Admin", "Creator", "Viewer"]);
+export const defaultLinkAccess = z.enum(["anyone", "members", "invited"]);
+
+export const signupRequest = z.object({
+  email: z.email(),
+  password: z.string().min(8).max(200),
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+});
+
+export const loginRequest = z.object({
+  email: z.email(),
+  password: z.string().min(1),
+});
+
+export const updateWorkspace = z
+  .object({
+    name: z.string().min(1).max(200).optional(),
+    logoKey: z.string().nullable().optional(),
+    inviteLinkEnabled: z.boolean().optional(),
+    restrictInvites: z.boolean().optional(),
+    defaultLinkAccess: defaultLinkAccess.optional(),
+    aiEnabled: z.boolean().optional(),
+    ssoEnabled: z.boolean().optional(),
+    autoDelete: z.boolean().optional(),
+    auditLogs: z.boolean().optional(),
+    groupDuplicates: z.boolean().optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, {
+    message: "at least one field is required",
+  });
+
+export const createWorkspace = z.object({ name: z.string().min(1).max(200) });
+export const switchWorkspace = z.object({ id: z.string().min(1) });
+export const joinWorkspace = z.object({
+  inviteUrl: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
+});
+
+export const updateMember = z
+  .object({ role: membershipRole })
+  .strict();
+
+export const createInvites = z.object({
+  emails: z.array(z.email()).min(1).max(50),
+  role: membershipRole.default("Viewer"),
+});
+
+export const updateMe = z
+  .object({
+    firstName: z.string().min(1).max(100).optional(),
+    lastName: z.string().min(1).max(100).optional(),
+    role: userRole.optional(),
+    theme: z.enum(["light", "dark"]).optional(),
+    notifyN1: z.boolean().optional(),
+    notifyN2: z.boolean().optional(),
+    notifyN3: z.boolean().optional(),
+    notifyN4: z.boolean().optional(),
+    notifyN5: z.boolean().optional(),
+  })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, {
+    message: "at least one field is required",
+  });
+
+export const createToken = z.object({ name: z.string().min(1).max(100) });
+
 export type RewindStatus = z.infer<typeof rewindStatus>;
 export type RewindKind = z.infer<typeof rewindKind>;
 export type EventKind = z.infer<typeof eventKind>;
@@ -107,3 +184,13 @@ export type CreateComment = z.infer<typeof createComment>;
 export type CreateFolder = z.infer<typeof createFolder>;
 export type UpdateFolder = z.infer<typeof updateFolder>;
 export type CreateRecordingLink = z.infer<typeof createRecordingLink>;
+export type SignupRequest = z.infer<typeof signupRequest>;
+export type LoginRequest = z.infer<typeof loginRequest>;
+export type UpdateWorkspace = z.infer<typeof updateWorkspace>;
+export type CreateWorkspace = z.infer<typeof createWorkspace>;
+export type SwitchWorkspace = z.infer<typeof switchWorkspace>;
+export type JoinWorkspace = z.infer<typeof joinWorkspace>;
+export type UpdateMember = z.infer<typeof updateMember>;
+export type CreateInvites = z.infer<typeof createInvites>;
+export type UpdateMe = z.infer<typeof updateMe>;
+export type CreateToken = z.infer<typeof createToken>;
