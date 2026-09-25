@@ -10,6 +10,7 @@ import {
   parseBody,
 } from "@/lib/http";
 import { listRewinds } from "@/lib/rewinds";
+import { errorSignature } from "@/lib/signature";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +62,19 @@ export async function POST(req: Request) {
   }
 
   const id = newId();
+  const signature = errorSignature(rewindEvents);
 
   try {
     const insertRewind = db
       .insert(rewinds)
-      .values({ ...fields, folderId, recordingLinkId, workspaceId, id })
+      .values({
+        ...fields,
+        folderId,
+        recordingLinkId,
+        workspaceId,
+        id,
+        errorSignature: signature,
+      })
       .returning();
     const [rows] = (await db.batch([
       insertRewind,

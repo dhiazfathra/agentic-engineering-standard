@@ -12,6 +12,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "bun src/db/seed-cli.ts",
+    "db:backfill-signatures": "bun src/db/backfill-signatures.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

@@ -137,6 +137,33 @@ describe("POST /api/rewinds", () => {
     );
   });
 
+  it("computes and stores the errorSignature from the events on create", async () => {
+    const insertChain = chain(undefined);
+    mocks.insert.mockReturnValue(insertChain);
+    mocks.batch.mockResolvedValue([[row]]);
+    await POST(
+      request({
+        ...validBody,
+        events: [
+          { t: 0, kind: "err", text: "Uncaught Error: boom 42", isError: true },
+        ],
+      }),
+    );
+    expect(insertChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ errorSignature: "error: boom n" }),
+    );
+  });
+
+  it("stores a null errorSignature when there is no error event", async () => {
+    const insertChain = chain(undefined);
+    mocks.insert.mockReturnValue(insertChain);
+    mocks.batch.mockResolvedValue([[row]]);
+    await POST(request(validBody));
+    expect(insertChain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ errorSignature: null }),
+    );
+  });
+
   it("batches only the rewind insert when there are no events", async () => {
     mocks.insert.mockReturnValue(chain(undefined));
     mocks.batch.mockResolvedValue([[row]]);

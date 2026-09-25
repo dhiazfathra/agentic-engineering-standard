@@ -18,9 +18,14 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
-      // seed-cli.ts is a thin, untested-by-design entry point: it only
-      // wires up a real db connection and calls seed(), which is tested.
-      exclude: ["src/**/*.test.{ts,tsx}", "src/db/seed-cli.ts"],
+      // seed-cli.ts and backfill-signatures.ts are thin, untested-by-design
+      // entry points: they only wire up a real db connection and call a
+      // pure/tested function (seed(), errorSignature()).
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/db/seed-cli.ts",
+        "src/db/backfill-signatures.ts",
+      ],
       thresholds: {
         lines: 100,
         branches: 100,

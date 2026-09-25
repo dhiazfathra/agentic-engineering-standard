@@ -25,6 +25,7 @@ Infra up:   docker compose up -d        # MinIO on :9000, console on :9001
 Infra down: docker compose down         # add -v to wipe the bucket
 Migrate:    bun run db:migrate          # drizzle-kit migrate against DATABASE_URL
 Seed:       bun run db:seed             # design's sample rewinds; idempotent (insert-if-missing, keeps user data)
+Backfill:   bun run db:backfill-signatures  # one-off: fills errorSignature on rows that predate it
 Dev:        bun run dev                 # next dev on :3000 and wxt dev, in parallel
 Dev (FF):   bun run --filter extension dev:firefox
 Test:       bun run test                # vitest run --coverage in every package
