@@ -117,6 +117,13 @@ export const createRecordingLink = z.object({
   name: z.string().min(1).max(100),
 });
 
+// A public `/rec/[id]` recording: video only, no reporter or session — the
+// route derives title, reporterName and workspace from the link itself.
+export const createRecRewind = z.object({
+  mediaKey: z.string().regex(mediaKeyPattern),
+  durationSeconds: z.number().gt(0),
+});
+
 // Accounts and workspaces.
 
 export const userRole = z.enum([
@@ -207,6 +214,7 @@ export type CreateComment = z.infer<typeof createComment>;
 export type CreateFolder = z.infer<typeof createFolder>;
 export type UpdateFolder = z.infer<typeof updateFolder>;
 export type CreateRecordingLink = z.infer<typeof createRecordingLink>;
+export type CreateRecRewind = z.infer<typeof createRecRewind>;
 export type SignupRequest = z.infer<typeof signupRequest>;
 export type LoginRequest = z.infer<typeof loginRequest>;
 export type UpdateWorkspace = z.infer<typeof updateWorkspace>;

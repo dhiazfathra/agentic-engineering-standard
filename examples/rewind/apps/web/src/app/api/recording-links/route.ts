@@ -1,19 +1,17 @@
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { createRecordingLink } from "@rewind/schema";
 import { recordingLinks } from "@/db/schema";
 import { db } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { parseBody } from "@/lib/http";
+import { listRecordingLinks } from "@/lib/rewinds";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const session = await requireSession(req);
   if (session instanceof NextResponse) return session;
-  const rows = await db.query.recordingLinks.findMany({
-    where: eq(recordingLinks.workspaceId, session.workspace.id),
-  });
+  const rows = await listRecordingLinks(session.workspace.id);
   return NextResponse.json(rows);
 }
 

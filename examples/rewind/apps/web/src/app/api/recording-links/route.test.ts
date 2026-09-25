@@ -10,21 +10,27 @@ function chain(resolved: unknown) {
 const session = { user: { id: "u1" }, workspace: { id: "w1" } };
 
 const mocks = vi.hoisted(() => ({
-  findMany: vi.fn(),
+  listRecordingLinks: vi.fn(),
   insert: vi.fn(),
   requireSession: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({
-  db: {
-    query: { recordingLinks: { findMany: mocks.findMany } },
-    insert: mocks.insert,
-  },
+  db: { insert: mocks.insert },
+}));
+vi.mock("@/lib/rewinds", () => ({
+  listRecordingLinks: mocks.listRecordingLinks,
 }));
 vi.mock("@/lib/auth", () => ({ requireSession: mocks.requireSession }));
 
 import { GET, POST } from "./route";
 
-const row = { id: "l1", workspaceId: "w1", name: "Beta link", createdAt: new Date() };
+const row = {
+  id: "l1",
+  workspaceId: "w1",
+  name: "Beta link",
+  createdAt: new Date(),
+  rewindCount: 3,
+};
 const request = (body: unknown) =>
   new Request("http://localhost/api/recording-links", {
     method: "POST",
@@ -46,8 +52,8 @@ describe("GET /api/recording-links", () => {
     expect(res.status).toBe(401);
   });
 
-  it("lists the session's workspace recording links", async () => {
-    mocks.findMany.mockResolvedValue([row]);
+  it("lists the session's workspace recording links, with rewindCount", async () => {
+    mocks.listRecordingLinks.mockResolvedValue([row]);
     const res = await GET(
       new Request("http://localhost/api/recording-links"),
     );
@@ -55,6 +61,7 @@ describe("GET /api/recording-links", () => {
     expect(await res.json()).toEqual([
       { ...row, createdAt: row.createdAt.toISOString() },
     ]);
+    expect(mocks.listRecordingLinks).toHaveBeenCalledWith("w1");
   });
 });
 

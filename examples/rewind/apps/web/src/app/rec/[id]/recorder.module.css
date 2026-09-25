@@ -1,0 +1,117 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rw-bg);
+  color: var(--rw-body);
+  padding: 16px;
+}
+
+.card {
+  width: 420px;
+  max-width: 100%;
+  background: var(--rw-surface);
+  border: 1px solid var(--rw-border);
+  border-radius: 18px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  box-shadow: var(--rw-pop);
+}
+
+.preview {
+  width: 100%;
+  height: 150px;
+  border-radius: 12px;
+  background: var(--rw-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.title {
+  font: 600 18px Poppins, sans-serif;
+  color: var(--rw-ink);
+  margin: 0;
+}
+
+.body {
+  font-size: 14px;
+  color: var(--rw-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.action {
+  margin-top: 6px;
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: var(--rw-btn);
+  color: var(--rw-btn-fg);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.action:hover {
+  background: var(--rw-btn-hover);
+}
+
+.action:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.stop {
+  margin-top: 6px;
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: var(--rw-err);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.error {
+  font-size: 13px;
+  color: var(--rw-err);
+  background: var(--rw-err-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.retry {
+  margin-top: 6px;
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: var(--rw-surface2);
+  color: var(--rw-ink);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+}
+
+.retry:hover {
+  background: var(--rw-soft);
+}

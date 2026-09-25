@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { contentTypeToExtension, newId, uploadRequest } from "@rewind/schema";
-import { requireSession } from "@/lib/auth";
 import { parseBody } from "@/lib/http";
 import { presignPut } from "@/lib/storage";
 
+// Public: `/rec/[id]`'s anonymous recorder needs this with no session, the
+// same way the extension's session-carrying fetch does. The key is a
+// random nanoid unrelated to any workspace, so a presigned PUT to it grants
+// no more than "upload one object of an allowed content type" either way.
 export async function POST(req: Request) {
-  const session = await requireSession(req);
-  if (session instanceof NextResponse) return session;
-
   const parsed = await parseBody(req, uploadRequest);
   if (parsed instanceof NextResponse) return parsed;
 

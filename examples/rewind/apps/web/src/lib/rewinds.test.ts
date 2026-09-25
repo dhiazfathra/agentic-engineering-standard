@@ -18,8 +18,13 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-const { getRewind, listRewinds, listFolders, listSimilarRewinds } =
-  await import("./rewinds");
+const {
+  getRewind,
+  listRewinds,
+  listFolders,
+  listSimilarRewinds,
+  listRecordingLinks,
+} = await import("./rewinds");
 
 it("finds a rewind with its events and comments ordered by t", async () => {
   const row = { id: "r1", events: [], comments: [] };
@@ -47,6 +52,15 @@ it("lists rewinds newest first, including one with 0 errors", async () => {
   ];
   mocks.orderBy.mockResolvedValue(rows);
   await expect(listRewinds("w1")).resolves.toBe(rows);
+});
+
+it("lists recording links newest first, including one with 0 rewinds", async () => {
+  const rows = [
+    { id: "l1", name: "Beta", rewindCount: 6 },
+    { id: "l2", name: "Support", rewindCount: 0 },
+  ];
+  mocks.orderBy.mockResolvedValue(rows);
+  await expect(listRecordingLinks("w1")).resolves.toBe(rows);
 });
 
 it("lists every folder in the workspace", async () => {

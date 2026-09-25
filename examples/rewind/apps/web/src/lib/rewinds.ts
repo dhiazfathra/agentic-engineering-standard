@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
-import { comments, events, folders, rewinds } from "@/db/schema";
+import { comments, events, folders, recordingLinks, rewinds } from "@/db/schema";
 import { db } from "@/lib/db";
 
 /** The row shape shared by `GET /api/rewinds/[id]` and the viewer page. */
@@ -87,3 +87,29 @@ export async function listFolders(workspaceId: string) {
 }
 
 export type FolderListItem = Awaited<ReturnType<typeof listFolders>>[number];
+
+/**
+ * Every recording link in a workspace, newest first, with `rewindCount`: a
+ * correlated count of Rewinds filed through it. Backs `/links` and
+ * `GET /api/recording-links`.
+ */
+export async function listRecordingLinks(workspaceId: string) {
+  return db
+    .select({
+      id: recordingLinks.id,
+      workspaceId: recordingLinks.workspaceId,
+      name: recordingLinks.name,
+      createdAt: recordingLinks.createdAt,
+      rewindCount: sql<number>`(
+        select count(*) from ${rewinds}
+        where "rewinds"."recordingLinkId" = "recording_links"."id"
+      )`.mapWith(Number),
+    })
+    .from(recordingLinks)
+    .where(eq(recordingLinks.workspaceId, workspaceId))
+    .orderBy(desc(recordingLinks.createdAt));
+}
+
+export type RecordingLinkListItem = Awaited<
+  ReturnType<typeof listRecordingLinks>
+>[number];
