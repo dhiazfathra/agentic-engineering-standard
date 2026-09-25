@@ -6,6 +6,13 @@ const mocks = vi.hoisted(() => ({
   listMembers: vi.fn(),
   getUsage: vi.fn(),
   mediaUrl: vi.fn(),
+  listIntegrations: vi.fn(),
+  flags: { INTEGRATIONS: false } as Record<string, boolean>,
+}));
+
+vi.mock("@/lib/flags", () => ({ flags: mocks.flags }));
+vi.mock("@/lib/integrations", () => ({
+  listIntegrations: mocks.listIntegrations,
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -52,6 +59,8 @@ beforeEach(() => {
     members: { used: 1, limit: 20 },
   });
   mocks.mediaUrl.mockResolvedValue("https://minio/signed");
+  mocks.flags.INTEGRATIONS = false;
+  mocks.listIntegrations.mockResolvedValue([]);
 });
 
 it("redirects to /login without a session", async () => {
@@ -65,8 +74,26 @@ it("redirects to /login without a session", async () => {
 it("404s for a tab not built yet", async () => {
   const { default: Settings } = await import("./page");
   await expect(
+    Settings({ params: Promise.resolve({ tab: "bogus" as never }) }),
+  ).rejects.toThrow("NOT_FOUND");
+});
+
+it("404s for a built tab whose flag is off (integrations)", async () => {
+  const { default: Settings } = await import("./page");
+  await expect(
     Settings({ params: Promise.resolve({ tab: "integrations" }) }),
   ).rejects.toThrow("NOT_FOUND");
+  expect(mocks.listIntegrations).not.toHaveBeenCalled();
+});
+
+it("loads connected integrations when the flag is on", async () => {
+  mocks.flags.INTEGRATIONS = true;
+  mocks.listIntegrations.mockResolvedValue(["Linear"]);
+  const { default: Settings } = await import("./page");
+  renderToStaticMarkup(
+    await Settings({ params: Promise.resolve({ tab: "general" }) }),
+  );
+  expect(mocks.listIntegrations).toHaveBeenCalledWith("w1");
 });
 
 it("404s for a built tab whose flag is off", async () => {

@@ -201,6 +201,7 @@ function baseProps(overrides: Record<string, unknown> = {}) {
     usage: usage(),
     logoUrl: null,
     avatarUrl: null,
+    connectedIntegrations: [],
     ...overrides,
   };
 }
@@ -416,24 +417,49 @@ describe("general tab", () => {
     expect(container.textContent).toContain("Couldn't upload that logo");
   });
 
-  it("flips SSO, AI, auto-delete and audit-log toggles when an admin", async () => {
+  it("flips AI, auto-delete and audit-log toggles when an admin", async () => {
     const fetchMock = jsonFetchFor({ "PATCH /api/workspace": { body: {} } });
     vi.stubGlobal("fetch", fetchMock);
     mount(<SettingsPage {...baseProps()} />);
     await flush();
-    for (const label of [
-      "Single sign-on",
-      "AI",
-      "Auto-delete old Rewinds",
-      "Audit logs",
-    ]) {
+    for (const label of ["AI", "Auto-delete old Rewinds", "Audit logs"]) {
       const toggle = container.querySelector(
         `button[aria-label="${label}"]`,
       ) as HTMLElement;
       click(toggle);
     }
     await flush();
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("opens the pricing overlay instead of saving when SSO is clicked and billing is on", async () => {
+    const fetchMock = jsonFetchFor({ "PATCH /api/workspace": { body: {} } });
+    vi.stubGlobal("fetch", fetchMock);
+    mount(<SettingsPage {...baseProps()} />);
+    await flush();
+    click(
+      container.querySelector(
+        'button[aria-label="Single sign-on"]',
+      ) as HTMLElement,
+    );
+    await flush();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Upgrade your plan");
+  });
+
+  it("saves SSO directly when billing is off", async () => {
+    Object.assign(mockFlags, { BILLING: false });
+    const fetchMock = jsonFetchFor({ "PATCH /api/workspace": { body: {} } });
+    vi.stubGlobal("fetch", fetchMock);
+    mount(<SettingsPage {...baseProps()} />);
+    await flush();
+    click(
+      container.querySelector(
+        'button[aria-label="Single sign-on"]',
+      ) as HTMLElement,
+    );
+    await flush();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not flip toggles for a non-admin", async () => {
@@ -813,15 +839,164 @@ describe("members tab", () => {
 });
 
 describe("billing tab", () => {
-  it("shows plan and usage bars, and toasts on upgrade", async () => {
+  it("shows plan, usage bars including AI summaries, and opens pricing on upgrade", async () => {
     vi.stubGlobal("fetch", jsonFetchFor({}));
     mount(<SettingsPage {...baseProps({ tab: "billing" })} />);
     await flush();
     expect(container.textContent).toContain("Free");
     expect(container.textContent).toContain("3 / 30");
+    expect(container.textContent).toContain("AI summaries");
+    click(byText("button", "Upgrade ↗"));
+    await flush();
+    expect(container.textContent).toContain("Upgrade your plan");
+    click(byText("button", "Close"));
+    await flush();
+    expect(container.textContent).not.toContain("Upgrade your plan");
+  });
+
+  it("hides the AI summaries row when AI_SUMMARY is off", async () => {
+    Object.assign(mockFlags, { AI_SUMMARY: false });
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mount(<SettingsPage {...baseProps({ tab: "billing" })} />);
+    await flush();
+    expect(container.textContent).not.toContain("AI summaries");
+  });
+
+  it("toasts a placeholder on upgrade when billing is off", async () => {
+    Object.assign(mockFlags, { BILLING: false });
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mount(<SettingsPage {...baseProps({ tab: "billing" })} />);
+    await flush();
     click(byText("button", "Upgrade ↗"));
     await flush();
     expect(container.textContent).toContain("Pricing isn't set up yet");
+  });
+});
+
+describe("integrations tab", () => {
+  it("connects and disconnects an app", async () => {
+    const fetchMock = jsonFetchFor({
+      "POST /api/integrations/Linear": { body: {} },
+      "DELETE /api/integrations/Linear": { body: {} },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    mount(<SettingsPage {...baseProps({ tab: "integrations" })} />);
+    await flush();
+    expect(container.textContent).toContain("Connect apps");
+    click(
+      container.querySelector('button[aria-label="Connect Linear"]') as HTMLElement,
+    );
+    await flush();
+    expect(
+      container.querySelector('button[aria-label="Disconnect Linear"]'),
+    ).toBeTruthy();
+    click(
+      container.querySelector(
+        'button[aria-label="Disconnect Linear"]',
+      ) as HTMLElement,
+    );
+    await flush();
+    expect(
+      container.querySelector('button[aria-label="Connect Linear"]'),
+    ).toBeTruthy();
+  });
+
+  it("toasts an error when connecting fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchFor({ "POST /api/integrations/Linear": { status: 500 } }),
+    );
+    mount(<SettingsPage {...baseProps({ tab: "integrations" })} />);
+    await flush();
+    click(
+      container.querySelector('button[aria-label="Connect Linear"]') as HTMLElement,
+    );
+    await flush();
+    expect(container.textContent).toContain("Couldn't connect Linear");
+  });
+
+  it("toasts an error when disconnecting fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      jsonFetchFor({ "DELETE /api/integrations/Linear": { status: 500 } }),
+    );
+    mount(
+      <SettingsPage
+        {...baseProps({
+          tab: "integrations",
+          connectedIntegrations: ["Linear"],
+        })}
+      />,
+    );
+    await flush();
+    click(
+      container.querySelector(
+        'button[aria-label="Disconnect Linear"]',
+      ) as HTMLElement,
+    );
+    await flush();
+    expect(container.textContent).toContain("Couldn't disconnect Linear");
+  });
+
+  it("shows already-connected apps as connected", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mount(
+      <SettingsPage
+        {...baseProps({
+          tab: "integrations",
+          connectedIntegrations: ["Linear"],
+        })}
+      />,
+    );
+    await flush();
+    expect(
+      container.querySelector('button[aria-label="Disconnect Linear"]'),
+    ).toBeTruthy();
+  });
+});
+
+describe("sdk tab", () => {
+  it("copies the snippet and verifies a domain", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mount(<SettingsPage {...baseProps({ tab: "sdk" })} />);
+    await flush();
+    const input = container.querySelector(
+      'input[aria-label="Domain to verify"]',
+    ) as HTMLInputElement;
+    setValue(input, "https://example.com");
+    click(byText("button", "Copy"));
+    click(byText("button", "Verify"));
+    await flush();
+    expect(container.textContent).toContain("Copied");
+    expect(container.textContent).toContain("No recording detected yet");
+  });
+});
+
+describe("mcp tab", () => {
+  it("shows tokens notice and AI agent catalog", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mount(<SettingsPage {...baseProps({ tab: "mcp" })} />);
+    await flush();
+    expect(container.textContent).toContain("Personal access tokens");
+    click(byText("button", "+ Create token"));
+    await flush();
+    expect(container.textContent).toContain("Manage tokens above");
+    expect(container.textContent).toContain("Claude");
+  });
+});
+
+describe("cli tab", () => {
+  it("switches OS and copies the install command", async () => {
+    vi.stubGlobal("fetch", jsonFetchFor({}));
+    mount(<SettingsPage {...baseProps({ tab: "cli" })} />);
+    await flush();
+    expect(container.textContent).toContain("brew install rewind-cli");
+    click(byText("button", "Linux"));
+    await flush();
+    expect(container.textContent).toContain("curl -fsSL");
+    click(byText("button", "Copy"));
+    await flush();
+    expect(container.textContent).toContain("Copied");
   });
 });
 

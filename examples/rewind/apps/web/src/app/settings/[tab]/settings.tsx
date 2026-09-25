@@ -14,6 +14,7 @@ import {
   type workspaces,
 } from "@/db/schema";
 import { flags, type Flags } from "@/lib/flags";
+import { INTEGRATION_CATALOG } from "@/lib/integrations-catalog";
 import type { MemberListItem } from "@/lib/members";
 import { applyTheme, setTheme } from "@/lib/theme";
 import type { Usage } from "@/lib/usage";
@@ -45,6 +46,7 @@ type Props = {
   usage: Usage;
   logoUrl: string | null;
   avatarUrl: string | null;
+  connectedIntegrations: string[];
 };
 
 type NavItem = { tab: SettingsTab; label: string; flag?: keyof Flags };
@@ -78,6 +80,7 @@ export function SettingsPage({
   usage,
   logoUrl,
   avatarUrl,
+  connectedIntegrations,
 }: Props) {
   const router = useRouter();
   const { toasts, showToast, undo, close } = useToast();
@@ -90,6 +93,26 @@ export function SettingsPage({
   const [inviteRole, setInviteRole] = useState<MembershipRole>("Viewer");
   const [invitingSaving, setInvitingSaving] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [pricingOpen, setPricingOpen] = useState(false);
+  const [connected, setConnected] = useState(connectedIntegrations);
+  const [integrationBusy, setIntegrationBusy] = useState<string | null>(null);
+
+  async function toggleIntegration(id: string, connect: boolean) {
+    setIntegrationBusy(id);
+    try {
+      const res = await fetch(`/api/integrations/${id}`, {
+        method: connect ? "POST" : "DELETE",
+      });
+      if (!res.ok) throw new Error("failed");
+      setConnected((c) =>
+        connect ? [...c, id] : c.filter((name) => name !== id),
+      );
+    } catch {
+      showToast(`Couldn't ${connect ? "connect" : "disconnect"} ${id}`, "error");
+    } finally {
+      setIntegrationBusy(null);
+    }
+  }
 
   const isAdmin = role === "Admin";
   const fullName = `${user.firstName} ${user.lastName}`.trim();
@@ -390,7 +413,11 @@ export function SettingsPage({
                 onDefaultLinkAccess={(v) =>
                   saveWorkspace("defaultLinkAccess", v, "default link access")
                 }
-                onSso={(v) => saveWorkspace("ssoEnabled", v, "single sign-on")}
+                onSso={
+                  flags.BILLING
+                    ? () => setPricingOpen(true)
+                    : (v) => saveWorkspace("ssoEnabled", v, "single sign-on")
+                }
                 onAi={(v) => saveWorkspace("aiEnabled", v, "AI")}
                 onAutoDelete={(v) =>
                   saveWorkspace("autoDelete", v, "auto-delete")
@@ -427,7 +454,33 @@ export function SettingsPage({
                 onRemove={removeMember}
               />
             )}
-            {tab === "billing" && <BillingTab usage={usage} onUpgrade={() => showToast("Pricing isn't set up yet")} />}
+            {tab === "billing" && (
+              <BillingTab
+                usage={usage}
+                onUpgrade={
+                  flags.BILLING
+                    ? () => setPricingOpen(true)
+                    : () => showToast("Pricing isn't set up yet")
+                }
+              />
+            )}
+            {tab === "integrations" && (
+              <IntegrationsTab
+                connected={connected}
+                busy={integrationBusy}
+                onToggle={toggleIntegration}
+              />
+            )}
+            {tab === "sdk" && (
+              <SdkTab
+                onVerify={() => showToast("No recording detected yet")}
+                onCopy={() => showToast("Copied")}
+              />
+            )}
+            {tab === "mcp" && (
+              <McpTab onNotice={() => showToast("Manage tokens above")} />
+            )}
+            {tab === "cli" && <CliTab onCopy={() => showToast("Copied")} />}
             {tab === "webhooks" && (
               <WebhooksTab
                 onSetUp={() => showToast("Webhooks aren't set up yet")}
@@ -464,7 +517,40 @@ export function SettingsPage({
           </div>
         </div>
       </div>
+      {pricingOpen && <PricingOverlay onClose={() => setPricingOpen(false)} />}
       <ToastStack toasts={toasts} onUndo={undo} onClose={close} />
+    </div>
+  );
+}
+
+function PricingOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className={styles.pricingOverlay}>
+      <button type="button" className={styles.secondaryButton} onClick={onClose}>
+        Close
+      </button>
+      <h2 className={styles.pricingTitle}>Upgrade your plan</h2>
+      <div className={styles.pricingPlans}>
+        <div className={styles.planBox}>
+          <div className={styles.planName}>Free</div>
+          <div className={styles.hint}>30 Rewinds and core features</div>
+          <div className={styles.planFeatures}>
+            <span>30 Rewinds</span>
+            <span>5 recording links</span>
+            <span>20 members</span>
+          </div>
+        </div>
+        <div className={`${styles.planBox} ${styles.planBoxFeatured}`}>
+          <div className={styles.planName}>Team</div>
+          <div className={styles.hint}>Unlimited Rewinds and AI features</div>
+          <div className={styles.planFeatures}>
+            <span>Unlimited Rewinds</span>
+            <span>200 AI summaries</span>
+            <span>Single sign-on</span>
+            <span>Audit logs and auto-delete</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -867,6 +953,12 @@ function BillingTab({
     ["Rewinds", usage.rewinds],
     ["Recording links", usage.recordingLinks],
     ["Members", usage.members],
+    ...(flags.AI_SUMMARY
+      ? ([["AI summaries", usage.aiSummaries]] as [
+          string,
+          { used: number; limit: number },
+        ][])
+      : []),
   ];
   return (
     <>
@@ -919,6 +1011,175 @@ function WebhooksTab({ onSetUp }: { onSetUp: () => void }) {
         <button type="button" className={styles.secondaryButton} onClick={onSetUp}>
           Set up ↗
         </button>
+      </div>
+    </>
+  );
+}
+
+function IntegrationsTab({
+  connected,
+  busy,
+  onToggle,
+}: {
+  connected: string[];
+  busy: string | null;
+  onToggle: (id: string, connect: boolean) => void;
+}) {
+  return (
+    <>
+      <div>
+        <div className={styles.label}>Connect apps</div>
+        <div className={styles.hint}>
+          Send Rewinds to the tools your team already uses
+        </div>
+      </div>
+      <div className={styles.cardGrid}>
+        {INTEGRATION_CATALOG.map((app) => {
+          const isConnected = connected.includes(app.id);
+          return (
+            <div className={styles.card} key={app.id}>
+              <div
+                className={styles.cardIcon}
+                style={{ background: app.color }}
+                aria-hidden="true"
+              >
+                {app.initial}
+              </div>
+              <div className={styles.label}>{app.name}</div>
+              <div className={styles.hint}>{app.description}</div>
+              <button
+                type="button"
+                aria-label={`${isConnected ? "Disconnect" : "Connect"} ${app.name}`}
+                className={isConnected ? styles.dangerButton : styles.primaryButton}
+                disabled={busy === app.id}
+                onClick={() => onToggle(app.id, !isConnected)}
+              >
+                {isConnected ? "Disconnect" : "Connect"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function SdkTab({
+  onVerify,
+  onCopy,
+}: {
+  onVerify: () => void;
+  onCopy: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  return (
+    <>
+      <div>
+        <div className={styles.label}>Connect your domain</div>
+        <div className={styles.hint}>
+          Add the Rewind snippet to start recording sessions on your site
+        </div>
+      </div>
+      <div className={styles.subheading}>1 · Install snippet</div>
+      <div className={styles.codeBlock}>
+        <div className={styles.codeBlockHead}>
+          <span className={styles.flex1}>index.html</span>
+          <button type="button" className={styles.linkButton} onClick={onCopy}>
+            Copy
+          </button>
+        </div>
+        <pre className={styles.codeBlockBody}>
+          {'<script src="https://cdn.rewind.dev/sdk.js" data-key="..."></script>'}
+        </pre>
+      </div>
+      <div className={styles.subheading}>2 · Verify</div>
+      <div className={styles.row}>
+        <input
+          className={styles.flex1}
+          placeholder="https://your-domain.com"
+          aria-label="Domain to verify"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+        />
+        <button type="button" className={styles.secondaryButton} onClick={onVerify}>
+          Verify
+        </button>
+      </div>
+    </>
+  );
+}
+
+function McpTab({ onNotice }: { onNotice: () => void }) {
+  return (
+    <>
+      <div>
+        <div className={styles.label}>Personal access tokens</div>
+        <div className={styles.hint}>
+          Used by MCP clients to authenticate as you
+        </div>
+      </div>
+      <button type="button" className={styles.secondaryButton} onClick={onNotice}>
+        + Create token
+      </button>
+      <div className={styles.divider} />
+      <div className={styles.subheading}>AI agents</div>
+      <div className={styles.cardGrid}>
+        {[
+          { name: "Claude", initial: "C", color: "#d97757" },
+          { name: "Cursor", initial: "C", color: "#000" },
+        ].map((agent) => (
+          <div className={styles.card} key={agent.name}>
+            <div
+              className={styles.cardIcon}
+              style={{ background: agent.color }}
+              aria-hidden="true"
+            >
+              {agent.initial}
+            </div>
+            <div className={styles.label}>{agent.name}</div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function CliTab({ onCopy }: { onCopy: () => void }) {
+  const [os, setOs] = useState<"mac" | "linux" | "windows">("mac");
+  const installCmd: Record<typeof os, string> = {
+    mac: "brew install rewind-cli",
+    linux: "curl -fsSL https://cli.rewind.dev/install.sh | sh",
+    windows: "winget install Rewind.Cli",
+  };
+  return (
+    <>
+      <div>
+        <div className={styles.label}>Rewind CLI</div>
+        <div className={styles.hint}>
+          Attach a Rewind to a bug report straight from your terminal
+        </div>
+      </div>
+      <div className={styles.subheading}>1 · Install</div>
+      <div className={styles.segmented}>
+        {(["mac", "linux", "windows"] as const).map((o) => (
+          <button
+            key={o}
+            type="button"
+            className={o === os ? styles.segmentActive : styles.segment}
+            onClick={() => setOs(o)}
+          >
+            {o === "mac" ? "macOS" : o === "linux" ? "Linux" : "Windows"}
+          </button>
+        ))}
+      </div>
+      <div className={styles.codeBlock}>
+        <div className={styles.codeBlockHead}>
+          <span className={styles.flex1}>Terminal</span>
+          <button type="button" className={styles.linkButton} onClick={onCopy}>
+            Copy
+          </button>
+        </div>
+        <pre className={styles.codeBlockBody}>{installCmd[os]}</pre>
       </div>
     </>
   );

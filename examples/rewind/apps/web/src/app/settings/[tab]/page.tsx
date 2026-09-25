@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getPageSession, publicUser } from "@/lib/auth";
 import { flags, type Flags } from "@/lib/flags";
+import { listIntegrations } from "@/lib/integrations";
 import { listMembers } from "@/lib/members";
 import { mediaUrl } from "@/lib/storage";
 import { getUsage } from "@/lib/usage";
@@ -14,16 +15,21 @@ const BUILT_TABS = new Set<SettingsTab>([
   "general",
   "members",
   "billing",
+  "integrations",
+  "sdk",
+  "mcp",
+  "cli",
   "webhooks",
   "account",
   "notifications",
 ]);
 
-// Integrations, Rewind SDK, MCP and CLI are chunk 7's flagged screens
-// (SPEC-design-parity.md § Build order); their routes 404 until then,
-// same as a built tab whose flag is off.
 const FLAG_FOR_TAB: Partial<Record<SettingsTab, keyof Flags>> = {
   billing: "BILLING",
+  integrations: "INTEGRATIONS",
+  sdk: "SDK",
+  mcp: "CLI_MCP",
+  cli: "CLI_MCP",
   webhooks: "WEBHOOKS",
 };
 
@@ -39,12 +45,14 @@ export default async function Settings({ params }: Params) {
   const flagName = FLAG_FOR_TAB[tab];
   if (flagName && !flags[flagName]) notFound();
 
-  const [members, usage, logoUrl, avatarUrl] = await Promise.all([
-    listMembers(session.workspace.id),
-    getUsage(session.workspace.id),
-    session.workspace.logoKey ? mediaUrl(session.workspace.logoKey) : null,
-    session.user.avatarKey ? mediaUrl(session.user.avatarKey) : null,
-  ]);
+  const [members, usage, logoUrl, avatarUrl, connectedIntegrations] =
+    await Promise.all([
+      listMembers(session.workspace.id),
+      getUsage(session.workspace.id),
+      session.workspace.logoKey ? mediaUrl(session.workspace.logoKey) : null,
+      session.user.avatarKey ? mediaUrl(session.user.avatarKey) : null,
+      flags.INTEGRATIONS ? listIntegrations(session.workspace.id) : [],
+    ]);
 
   return (
     <SettingsPage
@@ -56,6 +64,7 @@ export default async function Settings({ params }: Params) {
       usage={usage}
       logoUrl={logoUrl}
       avatarUrl={avatarUrl}
+      connectedIntegrations={connectedIntegrations}
     />
   );
 }
