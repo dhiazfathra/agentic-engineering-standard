@@ -39,6 +39,27 @@ export const uploadRequest = z.object({
   contentType: z.enum(contentTypes as [string, ...string[]]),
 });
 
+// Avatars and workspace logos: a smaller image-only set, gif included.
+export const contentTypeToImageExtension = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+} as const;
+
+const imageContentTypes = Object.keys(
+  contentTypeToImageExtension,
+) as (keyof typeof contentTypeToImageExtension)[];
+
+export const MAX_IMAGE_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+export const imageUploadRequest = z.object({
+  contentType: z.enum(imageContentTypes as [string, ...string[]]),
+  sizeBytes: z.number().int().positive().max(MAX_IMAGE_UPLOAD_BYTES),
+});
+
+export const avatarKeyPattern = /^avatars\/[A-Za-z0-9_-]{21}\.(png|jpg|gif)$/;
+export const logoKeyPattern = /^logos\/[A-Za-z0-9_-]{21}\.(png|jpg|gif)$/;
+
 export const event = z.object({
   t: z.number().min(0),
   kind: eventKind,
@@ -123,7 +144,7 @@ export const loginRequest = z.object({
 export const updateWorkspace = z
   .object({
     name: z.string().min(1).max(200).optional(),
-    logoKey: z.string().nullable().optional(),
+    logoKey: z.string().regex(logoKeyPattern).nullable().optional(),
     inviteLinkEnabled: z.boolean().optional(),
     restrictInvites: z.boolean().optional(),
     defaultLinkAccess: defaultLinkAccess.optional(),
@@ -165,6 +186,7 @@ export const updateMe = z
     notifyN3: z.boolean().optional(),
     notifyN4: z.boolean().optional(),
     notifyN5: z.boolean().optional(),
+    avatarKey: z.string().regex(avatarKeyPattern).nullable().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, {
@@ -177,6 +199,7 @@ export type RewindStatus = z.infer<typeof rewindStatus>;
 export type RewindKind = z.infer<typeof rewindKind>;
 export type EventKind = z.infer<typeof eventKind>;
 export type UploadRequest = z.infer<typeof uploadRequest>;
+export type ImageUploadRequest = z.infer<typeof imageUploadRequest>;
 export type Event = z.infer<typeof event>;
 export type CreateRewind = z.infer<typeof createRewind>;
 export type UpdateRewind = z.infer<typeof updateRewind>;

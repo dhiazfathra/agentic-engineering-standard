@@ -5,7 +5,7 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: mocks.getSignedUrl,
 }));
 
-const { mediaUrl, s3 } = await import("./storage");
+const { mediaUrl, presignPut, s3 } = await import("./storage");
 
 it("points at the MinIO endpoint with path-style bucket URLs", async () => {
   const endpoint = await s3.config.endpoint!();
@@ -31,5 +31,21 @@ it("signs a 1-hour GET URL for the media key", async () => {
       input: expect.objectContaining({ Key: "rewinds/abc.png" }),
     }),
     { expiresIn: 3600 },
+  );
+});
+
+it("signs a 15-minute PUT URL for a new key with the given content type", async () => {
+  mocks.getSignedUrl.mockResolvedValue("https://signed.example/put");
+  const url = await presignPut("rewinds/abc.png", "image/png");
+  expect(url).toBe("https://signed.example/put");
+  expect(mocks.getSignedUrl).toHaveBeenCalledWith(
+    s3,
+    expect.objectContaining({
+      input: expect.objectContaining({
+        Key: "rewinds/abc.png",
+        ContentType: "image/png",
+      }),
+    }),
+    { expiresIn: 900, signableHeaders: new Set(["content-type"]) },
   );
 });
