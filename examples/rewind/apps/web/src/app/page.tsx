@@ -27,6 +27,7 @@ export default async function Home({ searchParams }: Props) {
       folders={folders}
       view={view}
       folderId={folder}
+      groupDuplicates={session.workspace.groupDuplicates}
     />
   );
 }

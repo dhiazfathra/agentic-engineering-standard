@@ -4,6 +4,7 @@ import {
   filterByFolder,
   filterPalette,
   folderCounts,
+  groupDuplicates,
   libraryReducer,
   nextFolderName,
   paletteItems,
@@ -349,5 +350,42 @@ describe("libraryReducer", () => {
       { type: "restoreFolder", folder, rewindIds: ["r1"] },
     );
     expect(next.rewinds[0]).toBe(moved);
+  });
+});
+
+describe("groupDuplicates", () => {
+  const item = (id: string, errorSignature: string | null) => ({
+    id,
+    errorSignature,
+  });
+
+  it("returns every item unchanged with stackCount 1 when disabled", () => {
+    const rewinds = [item("a", "sig"), item("b", "sig")];
+    expect(groupDuplicates(rewinds, false)).toEqual([
+      { ...rewinds[0], stackCount: 1 },
+      { ...rewinds[1], stackCount: 1 },
+    ]);
+  });
+
+  it("groups rewinds sharing a signature under the first (newest) one", () => {
+    const rewinds = [item("a", "sig"), item("b", "sig"), item("c", "sig")];
+    const grouped = groupDuplicates(rewinds, true);
+    expect(grouped).toEqual([{ id: "a", errorSignature: "sig", stackCount: 3 }]);
+  });
+
+  it("never groups null-signature rewinds, even with each other", () => {
+    const rewinds = [item("a", null), item("b", null)];
+    expect(groupDuplicates(rewinds, true)).toEqual([
+      { id: "a", errorSignature: null, stackCount: 1 },
+      { id: "b", errorSignature: null, stackCount: 1 },
+    ]);
+  });
+
+  it("gives a signature with only one rewind stackCount 1", () => {
+    const rewinds = [item("a", "sig"), item("b", "other")];
+    expect(groupDuplicates(rewinds, true)).toEqual([
+      { id: "a", errorSignature: "sig", stackCount: 1 },
+      { id: "b", errorSignature: "other", stackCount: 1 },
+    ]);
   });
 });

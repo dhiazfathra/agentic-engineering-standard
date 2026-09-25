@@ -22,6 +22,7 @@ import {
   filterByFolder,
   filterPalette,
   folderCounts,
+  groupDuplicates,
   libraryReducer,
   nextFolderName,
   paletteItems,
@@ -44,6 +45,7 @@ type Props = {
   folders: FolderListItem[];
   view: LibraryView;
   folderId?: string;
+  groupDuplicates?: boolean;
 };
 
 /**
@@ -142,6 +144,7 @@ export function Library(props: Props) {
   // flash "Folder not found" in between. Only consulted while that folder
   // is absent, so an Undo that restores it shows its name again.
   const [leavingFolderId, setLeavingFolderId] = useState<string | null>(null);
+  const [grouped, setGrouped] = useState(props.groupDuplicates ?? true);
 
   const showError = useCallback(
     (text: string) => showToast(text, "error"),
@@ -208,6 +211,25 @@ export function Library(props: Props) {
       revert();
       showError(failText);
     }
+  };
+
+  const toggleGroupDuplicates = () => {
+    const next = !grouped;
+    setGrouped(next);
+    queueWrite(
+      "workspace:groupDuplicates",
+      grouped,
+      next,
+      (groupDuplicates) =>
+        write(
+          "/api/workspace",
+          "PATCH",
+          { groupDuplicates },
+          () => {},
+          "Could not update Group duplicates",
+        ),
+      setGrouped,
+    );
   };
 
   /** Hides happen before this; the toast's `×` sends, Undo restores. */
@@ -390,6 +412,8 @@ export function Library(props: Props) {
     folderId !== undefined && !activeFolder && leavingFolderId === folderId;
   const folderNotFound = folderId !== undefined && !activeFolder && !leaving;
   const shownRewinds = folderNotFound ? [] : filterByFolder(rewinds, folderId);
+  const isAll = folderId === undefined;
+  const gridRewinds = groupDuplicates(shownRewinds, isAll && grouped);
   const title =
     folderId === undefined || leaving
       ? "All Rewinds"
@@ -651,21 +675,42 @@ export function Library(props: Props) {
               </button>
             ))}
           </div>
+          {isAll && (
+            <button
+              type="button"
+              className={styles.groupToggle}
+              role="switch"
+              aria-checked={grouped}
+              onClick={toggleGroupDuplicates}
+            >
+              <span
+                className={`${styles.switchTrack} ${grouped ? styles.switchTrackOn : ""}`}
+              >
+                <span className={styles.switchThumb} />
+              </span>
+              Group duplicates
+            </button>
+          )}
         </header>
 
         <div className={styles.body}>
           {view === "grid" && (
             <div className={styles.grid}>
-              {shownRewinds.map((r) => (
+              {gridRewinds.map((r) => (
                 <div
                   key={r.id}
-                  className={styles.card}
+                  className={`${styles.card} ${r.stackCount > 1 ? styles.cardStacked : ""}`}
                   onContextMenu={(e) => rewindMenu(e, r)}
                   {...draggableProps(r)}
                 >
                   <Link href={`/r/${r.id}`} className={styles.cardLink}>
                     <div className={styles.thumb}>
                       <span className={styles.duration}>{duration(r)}</span>
+                      {r.stackCount > 1 && (
+                        <span className={styles.stackBadge}>
+                          {r.stackCount} similar
+                        </span>
+                      )}
                     </div>
                   </Link>
                   {rewindTitle(r, styles.cardTitle)}

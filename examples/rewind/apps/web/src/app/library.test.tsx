@@ -476,6 +476,70 @@ describe("context menu", () => {
   });
 });
 
+describe("group duplicates toggle", () => {
+  function mountAll(groupDuplicates = true) {
+    mount(
+      <Library
+        rewinds={[
+          rewind({ id: "a", errorSignature: "sig" } as Partial<RewindListItem>),
+          rewind({ id: "b", errorSignature: "sig" } as Partial<RewindListItem>),
+        ]}
+        folders={[]}
+        view="grid"
+        folderId={undefined}
+        groupDuplicates={groupDuplicates}
+      />,
+    );
+  }
+
+  it("shows the badge for a duplicate group when the flag starts on", () => {
+    mountAll(true);
+    expect(container.textContent).toContain("2 similar");
+  });
+
+  it("shows every card with no badge when the flag starts off", () => {
+    mountAll(false);
+    expect(container.textContent).not.toContain("similar");
+    expect(qAll('a[href="/r/a"]').length).toBe(2);
+    expect(qAll('a[href="/r/b"]').length).toBe(2);
+  });
+
+  it("toggling sends a PATCH to /api/workspace and updates the grid", async () => {
+    const fetchMock = stubFetch();
+    mountAll(false);
+    click(q('[role="switch"]'));
+    expect(container.textContent).toContain("2 similar");
+    await flush();
+    expect(fetchMock).toHaveBeenCalledWith("/api/workspace", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ groupDuplicates: true }),
+    });
+  });
+
+  it("a failed PATCH reverts the toggle", async () => {
+    stubFetch(false);
+    mountAll(false);
+    click(q('[role="switch"]'));
+    await flush();
+    expect(container.textContent).not.toContain("similar");
+    expect(container.textContent).toContain("Could not update Group duplicates");
+  });
+
+  it("does not render the toggle inside a folder", () => {
+    mount(
+      <Library
+        rewinds={[]}
+        folders={[folder()]}
+        view="grid"
+        folderId="f1"
+        groupDuplicates={true}
+      />,
+    );
+    expect(container.querySelector('[role="switch"]')).toBeNull();
+  });
+});
+
 describe("rename", () => {
   it.each(["grid", "list", "board"] as const)(
     "Enter commits and sends PATCH { title } in the %s view",

@@ -43,6 +43,35 @@ export function folderCounts<T extends { folderId: string | null }>(
   return counts;
 }
 
+export type Stacked<T> = T & { stackCount: number };
+
+/**
+ * Grid-only grouping. Keeps the first (newest, per `listRewinds`'s
+ * newest-first order) Rewind for each `errorSignature`, tagging it with
+ * how many share that signature. A null/undefined signature never groups
+ * with anything, including another null one. Pass `enabled: false` to get
+ * every Rewind back unchanged with `stackCount: 1`.
+ */
+export function groupDuplicates<
+  T extends { errorSignature: string | null | undefined },
+>(rewinds: T[], enabled: boolean): Stacked<T>[] {
+  if (!enabled) return rewinds.map((r) => ({ ...r, stackCount: 1 }));
+  const bySignature = new Map<string, Stacked<T>>();
+  const result: Stacked<T>[] = [];
+  for (const r of rewinds) {
+    const sig = r.errorSignature;
+    const existing = sig != null ? bySignature.get(sig) : undefined;
+    if (existing) {
+      existing.stackCount += 1;
+      continue;
+    }
+    const stacked: Stacked<T> = { ...r, stackCount: 1 };
+    if (sig != null) bySignature.set(sig, stacked);
+    result.push(stacked);
+  }
+  return result;
+}
+
 export type BoardColumn<T> = {
   status: RewindStatus;
   label: string;
