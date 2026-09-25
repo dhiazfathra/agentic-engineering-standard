@@ -45,7 +45,7 @@ examples/rewind/
   .env.example             every variable, with local defaults, no secrets
   apps/
     web/                   Next.js 16.3.6, App Router
-      src/app/api/         rewinds, folders, recording-links, uploads, health routes
+      src/app/api/         rewinds, folders, recording-links, uploads, health, workspace(s), members, invites, me, tokens, usage routes
       src/app/page.tsx     the library: server component, loads rewinds+folders, renders <Library>
       src/app/library.tsx  the library client component (view/board/palette/drag/toast state) + library.module.css
       src/app/r/[id]/      the viewer: page.tsx (server, loads the Rewind) + viewer.tsx (client)
