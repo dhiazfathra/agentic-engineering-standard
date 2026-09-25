@@ -202,6 +202,10 @@ export const updateMe = z
 
 export const createToken = z.object({ name: z.string().min(1).max(100) });
 
+export const createSupportMessage = z.object({
+  text: z.string().min(1).max(2_000),
+});
+
 export type RewindStatus = z.infer<typeof rewindStatus>;
 export type RewindKind = z.infer<typeof rewindKind>;
 export type EventKind = z.infer<typeof eventKind>;

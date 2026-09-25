@@ -1,35 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-function selectChain(value: number) {
-  const obj: Record<string, unknown> = {};
-  obj.from = vi.fn(() => obj);
-  obj.where = vi.fn(() => Promise.resolve([{ value }]));
-  return obj;
-}
-
 const session = { user: { id: "u1" }, workspace: { id: "w1" } };
 
 const mocks = vi.hoisted(() => ({
-  select: vi.fn(),
+  findMany: vi.fn(),
   requireSession: vi.fn(),
+  flags: { INTEGRATIONS: true },
 }));
-vi.mock("@/lib/db", () => ({ db: { select: mocks.select } }));
+vi.mock("@/lib/db", () => ({
+  db: { query: { integrations: { findMany: mocks.findMany } } },
+}));
 vi.mock("@/lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/auth")>();
   return { ...actual, requireSession: mocks.requireSession };
 });
+vi.mock("@/lib/flags", () => ({ flags: mocks.flags }));
 
 import { GET } from "./route";
 
-describe("GET /api/usage", () => {
+describe("GET /api/integrations", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.flags.INTEGRATIONS = true;
     mocks.requireSession.mockResolvedValue(session);
-    mocks.select
-      .mockReturnValueOnce(selectChain(3))
-      .mockReturnValueOnce(selectChain(1))
-      .mockReturnValueOnce(selectChain(4))
-      .mockReturnValueOnce(selectChain(2));
+  });
+
+  it("404s when the flag is off", async () => {
+    mocks.flags.INTEGRATIONS = false;
+    const res = await GET(new Request("http://localhost"));
+    expect(res.status).toBe(404);
   });
 
   it("401s without a session", async () => {
@@ -41,14 +40,10 @@ describe("GET /api/usage", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns counts against the Free plan limits", async () => {
+  it("lists connected integration names", async () => {
+    mocks.findMany.mockResolvedValue([{ name: "Linear" }, { name: "Slack" }]);
     const res = await GET(new Request("http://localhost"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      rewinds: { used: 3, limit: 30 },
-      recordingLinks: { used: 1, limit: 5 },
-      members: { used: 4, limit: 20 },
-      aiSummaries: { used: 2, limit: 30 },
-    });
+    expect(await res.json()).toEqual(["Linear", "Slack"]);
   });
 });

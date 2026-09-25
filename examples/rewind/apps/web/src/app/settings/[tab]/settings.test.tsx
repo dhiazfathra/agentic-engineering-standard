@@ -117,6 +117,7 @@ function usage(overrides: Partial<Usage> = {}): Usage {
     rewinds: { used: 3, limit: 30 },
     recordingLinks: { used: 1, limit: 5 },
     members: { used: 2, limit: 20 },
+    aiSummaries: { used: 0, limit: 30 },
     ...overrides,
   };
 }
