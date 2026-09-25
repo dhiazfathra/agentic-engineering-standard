@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "bun run --filter './apps/*' dev",
     "test": "bun run --filter '*' test",
-    "e2e": "bun run --filter '*' e2e",
+    "e2e": "bun run --filter web e2e && bun run --filter extension e2e",
     "lint": "bun run --filter '*' lint",
     "typecheck": "bun run --filter '*' typecheck",
     "build": "bun run --filter './apps/*' build",
