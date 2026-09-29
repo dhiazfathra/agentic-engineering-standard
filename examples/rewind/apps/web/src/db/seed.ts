@@ -24,6 +24,15 @@ export const SEED_USER_ID = "seed-user-admin";
 export const SEED_USER_EMAIL = "dhiazfathra@gmail.com";
 export const SEED_USER_PASSWORD = "rewind-dev";
 
+/**
+ * Password policy: the README-published `rewind-dev` only for local file or
+ * in-memory DBs. Any remote DATABASE_URL (e.g. prod Turso) gets a random
+ * password, which seed-cli.ts writes to the gitignored .seed-credentials.
+ */
+export function isLocalDb(url: string): boolean {
+  return url.startsWith("file:") || url === ":memory:";
+}
+
 // SPEC-design-parity.md § Seed: the default workspace's design name and
 // invite code. The migration (drizzle/0003_accounts_workspaces.sql) inserts
 // the row named "Default Workspace" before this workspace exists; seed()
@@ -33,7 +42,7 @@ export const SEED_WORKSPACE_NAME = "Dhiaz's Workspace";
 const SEED_WORKSPACE_INVITE_CODE = "RsSg6prV8T8";
 const MIGRATION_DEFAULT_WORKSPACE_NAME = "Default Workspace";
 
-// Design's other members, all password rewind-dev.
+// Design's other members, all share the seed password.
 const MEMBERS = [
   {
     id: "seed-user-maya",
@@ -58,7 +67,6 @@ const MEMBERS = [
   },
 ] as const;
 
-const MEMBER_PASSWORD = "rewind-dev";
 
 // Design's connected integrations.
 const INTEGRATIONS = ["Linear", "Slack"] as const;
@@ -418,7 +426,11 @@ export function buildSeedRows(now: Date): SeedRows {
  * name/invite code, which seed() renames once (see SEED_WORKSPACE_NAME
  * above) — guarded so it never overwrites a later user rename.
  */
-export async function seed(db: Db, now: Date): Promise<void> {
+export async function seed(
+  db: Db,
+  now: Date,
+  password = SEED_USER_PASSWORD,
+): Promise<void> {
   const rows = buildSeedRows(now);
 
   await db.batch([
@@ -427,7 +439,7 @@ export async function seed(db: Db, now: Date): Promise<void> {
       .values({
         id: SEED_USER_ID,
         email: SEED_USER_EMAIL,
-        passwordHash: hashPassword(SEED_USER_PASSWORD),
+        passwordHash: hashPassword(password),
         firstName: "Dhiaz",
         lastName: "Fathra",
         createdAt: now,
@@ -450,7 +462,7 @@ export async function seed(db: Db, now: Date): Promise<void> {
         .values({
           id: m.id,
           email: m.email,
-          passwordHash: hashPassword(MEMBER_PASSWORD),
+          passwordHash: hashPassword(password),
           firstName: m.firstName,
           lastName: m.lastName,
           createdAt: now,

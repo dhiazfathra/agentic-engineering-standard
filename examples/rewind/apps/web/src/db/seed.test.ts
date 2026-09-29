@@ -24,6 +24,7 @@ import {
   buildSeedRows,
   seed,
   SEED_USER_EMAIL,
+  isLocalDb,
   SEED_USER_ID,
   SEED_USER_PASSWORD,
   SEED_WORKSPACE_NAME,
@@ -288,5 +289,13 @@ describe("seed", () => {
       where: eq(rewinds.id, "user-rewind-in-seed-folder"),
     });
     expect(userRewind?.folderId).toBe("seed-folder-checkout");
+  });
+});
+
+describe("seed password policy", () => {
+  it("treats file and memory URLs as local, remote as not", () => {
+    expect(isLocalDb("file:local.db")).toBe(true);
+    expect(isLocalDb(":memory:")).toBe(true);
+    expect(isLocalDb("libsql://x.turso.io")).toBe(false);
   });
 });

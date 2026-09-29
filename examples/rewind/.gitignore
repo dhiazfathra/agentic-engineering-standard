@@ -23,6 +23,7 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 local.db
+.seed-credentials
 local.db-*
 # bun only: bun.lock is the one lockfile
 package-lock.json

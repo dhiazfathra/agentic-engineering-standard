@@ -73,8 +73,12 @@ existing rows. It creates:
   testers" (14 Rewinds), some sharing an error signature so "group
   duplicates" has something to group.
 
-Log in at `/login` with any of the accounts above. These credentials are
-for local development and CI e2e only — never reuse them anywhere real.
+Log in at `/login` with any of the accounts above. The `rewind-dev`
+password applies only when `DATABASE_URL` is a local `file:` database (or
+`:memory:`). Against any remote database (for example production Turso),
+`db:seed` uses a random password instead and writes it to
+`apps/web/.seed-credentials` (gitignored, mode 600). Never reuse
+`rewind-dev` anywhere real.
 
 ## How to run
 
