@@ -120,6 +120,26 @@ describe("createSession / cookies", () => {
     );
   });
 
+  it("session cookies are Secure only in production", async () => {
+    const { NextResponse } = await import("next/server");
+    const secureFlag = (fn: (r: ReturnType<typeof NextResponse.json>) => void) => {
+      const res = NextResponse.json({});
+      const set = vi.fn();
+      res.cookies.set = set;
+      fn(res);
+      return set.mock.calls[0][2].secure;
+    };
+    for (const [env, secure] of [
+      ["production", true],
+      ["development", false],
+    ] as const) {
+      vi.stubEnv("NODE_ENV", env);
+      expect(secureFlag((r) => setSessionCookie(r, "tok"))).toBe(secure);
+      expect(secureFlag((r) => clearSessionCookie(r))).toBe(secure);
+    }
+    vi.unstubAllEnvs();
+  });
+
   it("clearSessionCookie expires the cookie", async () => {
     const set = vi.fn();
     const { NextResponse } = await import("next/server");
