@@ -16,6 +16,12 @@ const mocks = vi.hoisted(() => ({
   createSession: vi.fn(),
   setSessionCookie: vi.fn(),
   setEmailCookie: vi.fn(),
+  rateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
+  rateLimit: mocks.rateLimit,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -68,6 +74,15 @@ describe("POST /api/auth/signup", () => {
     vi.resetAllMocks();
     mocks.createSession.mockResolvedValue("tok");
     mocks.findFirstInvite.mockResolvedValue(undefined);
+    mocks.rateLimit.mockResolvedValue(null);
+  });
+
+  it("returns the rate limiter's 429 without creating a user", async () => {
+    const limited = new Response(null, { status: 429 });
+    mocks.rateLimit.mockResolvedValue(limited);
+    const res = await POST(request(validBody));
+    expect(res).toBe(limited);
+    expect(mocks.insert).not.toHaveBeenCalled();
   });
 
   it("400s on an invalid body", async () => {

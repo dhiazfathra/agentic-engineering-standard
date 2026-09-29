@@ -12,12 +12,18 @@ import {
   setSessionCookie,
 } from "@/lib/auth";
 import { isUniqueViolation, parseBody } from "@/lib/http";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const parsed = await parseBody(req, signupRequest);
   if (parsed instanceof NextResponse) return parsed;
+
+  const limited = await rateLimit([
+    { key: `signup:ip:${clientIp(req)}`, limit: 10 },
+  ]);
+  if (limited) return limited;
 
   const email = parsed.email.toLowerCase();
   const passwordHash = hashPassword(parsed.password);
