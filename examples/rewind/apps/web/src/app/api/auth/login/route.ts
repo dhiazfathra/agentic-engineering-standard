@@ -11,6 +11,7 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { parseBody } from "@/lib/http";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,13 @@ export async function POST(req: Request) {
   if (parsed instanceof NextResponse) return parsed;
 
   const email = parsed.email.toLowerCase();
+  const ip = clientIp(req);
+  const limited = await rateLimit([
+    { key: `login:ip-email:${ip}:${email}`, limit: 10 },
+    { key: `login:ip:${ip}`, limit: 30 },
+  ]);
+  if (limited) return limited;
+
   const invalid = () =>
     NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
 

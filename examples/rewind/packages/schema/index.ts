@@ -143,6 +143,11 @@ export const signupRequest = z.object({
   lastName: z.string().min(1).max(100),
 });
 
+export const changePasswordRequest = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(200),
+});
+
 export const loginRequest = z.object({
   email: z.email(),
   password: z.string().min(1),
@@ -220,6 +225,7 @@ export type UpdateFolder = z.infer<typeof updateFolder>;
 export type CreateRecordingLink = z.infer<typeof createRecordingLink>;
 export type CreateRecRewind = z.infer<typeof createRecRewind>;
 export type SignupRequest = z.infer<typeof signupRequest>;
+export type ChangePasswordRequest = z.infer<typeof changePasswordRequest>;
 export type LoginRequest = z.infer<typeof loginRequest>;
 export type UpdateWorkspace = z.infer<typeof updateWorkspace>;
 export type CreateWorkspace = z.infer<typeof createWorkspace>;

@@ -72,7 +72,7 @@ export function setEmailCookie(res: NextResponse, email: string): void {
   });
 }
 
-function readCookie(req: Request, name: string): string | undefined {
+export function readCookie(req: Request, name: string): string | undefined {
   const header = req.headers.get("cookie");
   if (!header) return undefined;
   for (const part of header.split(";")) {

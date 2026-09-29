@@ -114,6 +114,13 @@ export const sessions = sqliteTable("sessions", {
   expiresAt: integer({ mode: "timestamp" }).notNull(),
 });
 
+// Fixed-window counters for lib/rate-limit.ts. `key` is `<action>:<subject>`.
+export const rateLimits = sqliteTable("rate_limits", {
+  key: text().primaryKey(),
+  windowStart: integer().notNull(),
+  count: integer().notNull(),
+});
+
 export const accessTokens = sqliteTable("access_tokens", {
   id: text().primaryKey().$defaultFn(newId),
   userId: text()

@@ -8,6 +8,12 @@ const mocks = vi.hoisted(() => ({
   setSessionCookie: vi.fn(),
   setEmailCookie: vi.fn(),
   verifyPassword: vi.fn(),
+  rateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/rate-limit", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/rate-limit")>()),
+  rateLimit: mocks.rateLimit,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -48,6 +54,23 @@ describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.createSession.mockResolvedValue("tok");
+    mocks.rateLimit.mockResolvedValue(null);
+  });
+
+  it("returns the 429 when rate limited, keyed by ip+email and ip", async () => {
+    const limited = new Response(null, { status: 429 });
+    mocks.rateLimit.mockResolvedValue(limited);
+    const req = new Request("http://localhost/api/auth/login", {
+      method: "POST",
+      headers: { "x-forwarded-for": "9.9.9.9, 1.1.1.1" },
+      body: JSON.stringify(validBody),
+    });
+    expect(await POST(req)).toBe(limited);
+    expect(mocks.rateLimit).toHaveBeenCalledWith([
+      { key: "login:ip-email:9.9.9.9:a@example.com", limit: 10 },
+      { key: "login:ip:9.9.9.9", limit: 30 },
+    ]);
+    expect(mocks.findFirstUser).not.toHaveBeenCalled();
   });
 
   it("400s on an invalid body", async () => {
