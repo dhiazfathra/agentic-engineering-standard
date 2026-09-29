@@ -101,7 +101,10 @@ The extension e2e honors it the same way.
 The Vercel project `rewind` is linked with root directory
 `examples/rewind/apps/web` and connected to this GitHub repo, so pushes to
 `main` deploy. An ignored build step (`git diff --quiet HEAD^ HEAD -- .`)
-skips deploys that don't touch this directory.
+skips deploys that don't touch this directory. The `build` script runs
+`drizzle-kit migrate` before `next build` when `VERCEL_ENV=production` (the
+only environment with `DATABASE_AUTH_TOKEN`), so a deploy never ships ahead
+of its schema. Local and preview builds skip it.
 
 Production: <https://rewind-ecru.vercel.app>. `/api/health` reports
 `"database":"ok"` there; `"storage":"unreachable"` is expected until MinIO
