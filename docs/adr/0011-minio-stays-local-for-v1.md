@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Narrows ADR-0003, which named "one VPS" for MinIO before any
+Superseded by ADR-0013 (2026-09-30). Was: Accepted. Narrows ADR-0003, which named "one VPS" for MinIO before any
 code existed.
 
 ## Date

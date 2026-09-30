@@ -52,6 +52,16 @@ server-side call to MinIO (checking or deleting a blob) does not. Point
 moves to a reachable host, and have a health check report storage as
 unreachable from Vercel — that is the true state, not a bug.
 
+Once MinIO moves to a reachable host, serve it over HTTPS behind a reverse
+proxy that passes `Host` through unchanged (presigned URLs sign it). A
+browser on the HTTPS app blocks `http://` media as mixed content.
+
+Set the Vercel project's function region next to the Turso database
+(`vercel api /v9/projects/<name> -X PATCH -F serverlessFunctionRegion=<region>`,
+then redeploy). Vercel defaults to `iad1` wherever the database is. Vercel
+Sensitive variables read back as `[SENSITIVE]` from `vercel env pull`, so
+keep their source of truth outside Vercel.
+
 ## Deploy
 
 Link the Vercel project with its root directory set to the app's
