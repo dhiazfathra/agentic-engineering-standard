@@ -1,6 +1,10 @@
 # Plan: MinIO on a VPS for production media
 
-Status: proposed. Unblocks D1 in `DEFERRED.md`.
+Status: superseded 2026-09-30. D1 was closed on the existing evoucher VM
+instead of a new VPS: nginx and certbot (already serving bugrail) proxy
+`https://cdn-rewind.dermaesthetics.id` to a PM2-run MinIO, not Caddy and
+Docker. See root `docs/adr/0013-rewind-minio-on-company-vm.md`. The
+storage requirements table below still holds.
 
 ## Problem
 

@@ -82,7 +82,7 @@ invalid variable.
 | --------------------- | ----------------------- | --------------------------------------------------------- |
 | `DATABASE_URL`        | `file:local.db`         | `libsql://rewind-dhiazfathra.aws-ap-northeast-1.turso.io` |
 | `DATABASE_AUTH_TOKEN` | unset                   | Turso token, production only, never in a file             |
-| `S3_ENDPOINT`         | `http://localhost:9000` | `http://localhost:9000` (MinIO stays on this PC)          |
+| `S3_ENDPOINT`         | `http://localhost:9000` | `https://cdn-rewind.dermaesthetics.id`                    |
 | `S3_BUCKET`           | `rewind`                | `rewind`                                                  |
 | `S3_ACCESS_KEY`       | `rewind`                | same                                                      |
 | `S3_SECRET_KEY`       | local-only value        | same, production only                                     |
@@ -107,6 +107,7 @@ only environment with `DATABASE_AUTH_TOKEN`), so a deploy never ships ahead
 of its schema. Local and preview builds skip it.
 
 Production: <https://rewind-ecru.vercel.app>. `/api/health` reports
-`"database":"ok"` there; `"storage":"unreachable"` is expected until MinIO
-moves off this PC (see the note on Vercel-against-local-MinIO in
-`../SPEC-infra.md`).
+`{"database":"ok","storage":"ok"}`. Functions run in `hnd1` (Tokyo), next to
+Turso. Production MinIO runs on the evoucher VM behind nginx at
+`https://cdn-rewind.dermaesthetics.id`; see root
+`docs/adr/0013-rewind-minio-on-company-vm.md`.

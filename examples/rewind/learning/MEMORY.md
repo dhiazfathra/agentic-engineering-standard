@@ -11,7 +11,9 @@ Update a line when it changes and delete it when it is wrong.
 - 2026-09-23 UI source of truth: Claude Design project `9bb10f93-f534-4e75-831a-253a96666114`, file `Rewind.dc.html`. Read it with DesignSync `get_file` after `/design-login`.
 - 2026-09-23 Turso cloud DB `rewind` exists in `aws-ap-northeast-1` (`libsql://rewind-dhiazfathra.aws-ap-northeast-1.turso.io`). No token yet.
 - 2026-09-23 Styling is CSS Modules plus the design's CSS variables, not Tailwind: the design is plain CSS over `_ds` and `--rw-*` tokens, so it ports as written. `create-next-app` defaults to Tailwind; pass `--no-tailwind`.
-- 2026-09-23 v1 deploys to Vercel but keeps MinIO on this PC. Presigned URLs work from Vercel; server-to-MinIO calls do not. MinIO moves to a VPS next iteration.
+- 2026-09-30 Production MinIO is on the evoucher VM (this machine), run by PM2 from `~/minio/start.sh`, behind nginx at `https://cdn-rewind.dermaesthetics.id` (site file `/etc/nginx/sites-available/cdn-rewind.dermaesthetics.id`, certbot TLS). The VM also serves bugrail, so run `sudo nginx -t` before any reload. Root ADR-0013.
+- 2026-09-30 Vercel functions run in `hnd1` (Tokyo) to sit next to Turso; set via the project's `serverlessFunctionRegion`, not `vercel.json`.
+- 2026-09-30 Vercel production vars are Sensitive, so `vercel env pull` returns `[SENSITIVE]`: read values from their source (`~/minio/app.env`, Turso), not from Vercel.
 - 2026-09-23 Bun 1.4.2 is the package manager and script runner, not pnpm (user decision). Node 24 stays the runtime; Vitest stays the test runner.
 - 2026-09-23 Vercel: CLI logged in as `envisionlab-ai`; project `rewind` goes under team `envision-labs-projects-71c0945a`, root `examples/rewind/apps/web`.
 - 2026-09-23 Deviations from SPEC-infra, each recorded in its commit: ESLint 9.39.5 not 10; fonts via `next/font/google` instead of copied `.ttf` files; `parseEnv` lives in `parse-env.ts` so `drizzle.config.ts` can reuse it.
